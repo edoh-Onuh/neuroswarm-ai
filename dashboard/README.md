@@ -418,10 +418,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Contact & Support
 
-**Developer**: Adanu Brown
+**Developer**: John Onuh
 
 - **GitHub**: [@edoh-Onuh](https://github.com/edoh-Onuh/)
-- **Twitter/X**: [@Adanubrown](https://twitter.com/Adanubrown)
+- **Twitter/X**: [@Adanubrown](https://x.com/Adanubrown)
 - **Email**: [adanu1947@gmail.com](mailto:adanu1947@gmail.com)
 
 ### Getting Help
@@ -485,7 +485,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🌐 Live Demo
 
-**Production**: [https://neuroswarm-ai.vercel.app](https://neuroswarm-ai.vercel.app) *(Coming Soon)*
+**Production**: [https://neuroswarm-ai.vercel.app](https://neuroswarm-ai.vercel.app) ✅ **LIVE NOW!**
 
 **Testnet Explorer**: [View Program on Solana Explorer](https://explorer.solana.com/address/56Vy8e8V4E6UZnsa6uDRg8HFiPwroz6nRKh7rm9xAfeK?cluster=devnet)
 
@@ -504,11 +504,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**Built with ❤️ by Adanu Brown**
+**Built with ❤️ by John Onuh**
 
 ⭐ Star this repo if you find it useful!
 
-[GitHub](https://github.com/edoh-Onuh/) • [Twitter](https://twitter.com/Adanubrown) • [Email](mailto:adanu1947@gmail.com)
+[GitHub](https://github.com/edoh-Onuh/) • [Twitter](https://x.com/Adanubrown) • [Email](mailto:adanu1947@gmail.com)
 
 </div>
 - Time remaining for active votes
@@ -638,9 +638,6 @@ npm run dev
 - [Tailwind CSS](https://tailwindcss.com/docs)
 - [Recharts](https://recharts.org/en-US/)
 
-## 🎉 Demo
-
-Visit the live dashboard: [Coming Soon]
 
 ## 📝 License
 

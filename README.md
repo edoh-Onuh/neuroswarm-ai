@@ -1,10 +1,12 @@
 # 🤖 NeuroSwarm AI - Autonomous Intelligence Protocol
 
-> **Autonomous Multi-Agent Coordination System Built Entirely by AI on Solana**
+> **Advanced Multi-Agent Coordination System with Sentiment Analysis, Arbitrage Detection, Custom Agent Teams, and Agent Marketplace on Solana**
 
 [![Solana](https://img.shields.io/badge/Solana-9945FF?style=for-the-badge&logo=solana&logoColor=white)](https://solana.com)
 [![Rust](https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactnative.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
@@ -59,7 +61,9 @@ The Solana program manages:
 
 ### Agent Framework (Python)
 
-Five specialized autonomous agents:
+Nine specialized autonomous agents:
+
+**Core Coordination Agents:**
 
 1. **🎯 Consensus Agent** (`consensus_agent.py`)
    - Coordinates decision-making across agents
@@ -85,6 +89,32 @@ Five specialized autonomous agents:
    - Analyzes historical performance
    - Adapts strategies using reinforcement learning
    - Updates agent models based on outcomes
+
+**Advanced Specialized Agents:**
+
+6. **💭 Sentiment Analysis Agent** (`sentiment_agent.py`)
+   - Analyzes market sentiment from Twitter, Reddit, and news
+   - Monitors on-chain sentiment indicators
+   - Classifies sentiment as bullish, bearish, or neutral
+   - Provides composite sentiment scores with confidence levels
+
+7. **💸 Arbitrage Agent** (`arbitrage_agent.py`)
+   - Detects cross-DEX arbitrage opportunities
+   - Monitors prices across Raydium, Orca, Jupiter, Lifinity, Meteora
+   - Calculates optimal trade sizes and profit potential
+   - Accounts for fees and slippage
+
+8. **🛠️ Custom Agent Builder** (`custom_agent_builder.py`)
+   - Create custom agent teams from templates
+   - 5 pre-built templates: Conservative, Aggressive, Sentiment Specialist, Arbitrage Hunter, DeFi Strategist
+   - Validate team composition and capabilities
+   - Export/import team configurations
+
+9. **🏪 Agent Marketplace** (`agent_marketplace.py`)
+   - List agents for rent with performance metrics
+   - Search and filter agents by capabilities, rating, and price
+   - Agent leaderboards with reputation scoring
+   - Performance tracking and reviews system
 
 ---
 
@@ -327,7 +357,7 @@ pytest tests/test_learning.py       # Learning algorithms
 - ✅ Byzantine fault-tolerant voting system
 - ✅ Agent registration and reputation tracking
 - ✅ Program deployed to Solana devnet
-- ✅ All 5 specialized agents implemented
+- ✅ All 5 core specialized agents implemented
 - ✅ Simulation environment and testing suite
 
 **Status**: Deployed at `56Vy8e8V4E6UZnsa6uDRg8HFiPwroz6nRKh7rm9xAfeK`
@@ -336,7 +366,7 @@ pytest tests/test_learning.py       # Learning algorithms
 - ✅ DeFi portfolio management live demo (`demos/portfolio_manager.py`)
 - ✅ Support for custom agent types (Governance, Security, Liquidity, Arbitrage, Custom)
 - ✅ Cross-program invocation (CPI) framework (`programs/agent_swarm/src/cpi.rs`)
-- ✅ Agent marketplace for community agents (`programs/agent_swarm/src/marketplace.rs`)
+- ✅ Agent marketplace backend (`agents/agent_marketplace.py`)
 - ✅ Enhanced learning algorithms (Q-learning with SQLite persistence)
 - ✅ Integration with Jupiter DEX (full V6 API client)
 - 🔄 Orca and Raydium integration (CPI framework ready, full clients pending)
@@ -347,6 +377,23 @@ pytest tests/test_learning.py       # Learning algorithms
 - 🔄 Integration with other Solana protocols (CPI framework extensible)
 - 🔄 Advanced AI model integration (framework ready, API calls pending)
 - 📋 Mainnet deployment with audits (devnet complete, audits required)
+
+### Phase 4: Advanced Features ✅ **COMPLETED Q1 2026**
+- ✅ Sentiment Analysis Agent with multi-source sentiment tracking
+- ✅ Arbitrage Detection Agent monitoring 5 DEXes
+- ✅ Custom Agent Builder with 5 pre-built templates
+- ✅ Agent Marketplace with ratings, reviews, and leaderboards
+- ✅ Advanced Dashboard UI with sentiment, arbitrage, and marketplace tabs
+- ✅ Mobile app scaffold (React Native) for on-the-go monitoring
+- ✅ Comprehensive documentation (ADVANCED_FEATURES.md)
+
+### Phase 5: Mobile & Enterprise 🔄 **IN PROGRESS Q1 2026**
+- ✅ React Native mobile app structure
+- 📋 iOS and Android builds
+- 📋 Push notifications for agent actions
+- 📋 Biometric authentication
+- 📋 Enterprise team management features
+- 📋 White-label agent swarm solutions
 
 ---
 

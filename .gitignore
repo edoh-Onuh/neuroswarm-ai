@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.env
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Rust
+target/
+**/*.rs.bk
+Cargo.lock
+
+# Anchor
+.anchor/
+test-ledger/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keys (IMPORTANT: Never commit private keys!)
+keys/*.json
+*.pem
+*.key
+
+# Logs
+*.log
+logs/
+
+# Node
+node_modules/
+yarn-error.log
+package-lock.json
+
+# Build artifacts
+dist/
+build/
+*.wasm
+
+# Environment
+.env.local
+.env.production
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Documentation builds
+docs/_build/

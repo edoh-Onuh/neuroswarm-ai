@@ -1,4 +1,4 @@
-# 🤖 Solana Agent Swarm Intelligence Protocol (ASIP)
+# 🤖 NeuroSwarm AI - Autonomous Intelligence Protocol
 
 > **Autonomous Multi-Agent Coordination System Built Entirely by AI on Solana**
 
@@ -17,13 +17,13 @@
 
 ---
 
-## 🎯 What is ASIP?
+## 🎯 What is NeuroSwarm AI?
 
-**Solana Agent Swarm Intelligence Protocol** is the first fully autonomous multi-agent coordination system built on Solana. It demonstrates emergent intelligence through decentralized agent consensus, enabling multiple specialized AI agents to coordinate complex decision-making without human intervention.
+**NeuroSwarm AI** is the first fully autonomous multi-agent coordination system built on Solana. It demonstrates emergent intelligence through decentralized agent consensus, enabling multiple specialized AI agents to coordinate complex decision-making without human intervention.
 
 ### The Innovation
 
-Traditional AI systems are centralized and opaque. ASIP is different:
+Traditional AI systems are centralized and opaque. NeuroSwarm AI is different:
 
 - **Fully On-Chain Coordination**: All agent decisions, votes, and executions are recorded on Solana
 - **Emergent Intelligence**: Complex behaviors emerge from simple agent interactions

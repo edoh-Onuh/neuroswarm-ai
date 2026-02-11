@@ -14,6 +14,9 @@ import NotificationCenter from '@/components/NotificationCenter'
 import CommandPalette from '@/components/CommandPalette'
 import ExportPanel from '@/components/ExportPanel'
 import AIInsights from '@/components/AIInsights'
+import SentimentPanel from '@/components/SentimentPanel'
+import ArbitragePanel from '@/components/ArbitragePanel'
+import MarketplacePanel from '@/components/MarketplacePanel'
 import { Activity, TrendingUp, Users, Vote, Loader2 } from 'lucide-react'
 import { useDashboard } from '@/context/DashboardContext'
 
@@ -23,7 +26,7 @@ const RPC_URL = 'https://api.devnet.solana.com'
 export default function Dashboard() {
   const { isConnected, isRefreshing } = useDashboard()
   const [connection] = useState(() => new Connection(RPC_URL, 'confirmed'))
-  const [activeTab, setActiveTab] = useState<'overview' | 'agents' | 'proposals' | 'portfolio' | 'governance'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'agents' | 'proposals' | 'portfolio' | 'governance' | 'sentiment' | 'arbitrage' | 'marketplace'>('overview')
   const [selectedAgent, setSelectedAgent] = useState<any>(null)
   const [selectedProposal, setSelectedProposal] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -66,6 +69,9 @@ export default function Dashboard() {
     { id: 'proposals' as const, label: 'Proposals', icon: Vote },
     { id: 'portfolio' as const, label: 'Portfolio', icon: TrendingUp },
     { id: 'governance' as const, label: 'Governance', icon: Users },
+    { id: 'sentiment' as const, label: 'Sentiment', icon: TrendingUp },
+    { id: 'arbitrage' as const, label: 'Arbitrage', icon: Activity },
+    { id: 'marketplace' as const, label: 'Marketplace', icon: Users },
   ]
 
   return (
@@ -152,6 +158,18 @@ export default function Dashboard() {
 
         {activeTab === 'governance' && (
           <GovernancePanel />
+        )}
+
+        {activeTab === 'sentiment' && (
+          <SentimentPanel />
+        )}
+
+        {activeTab === 'arbitrage' && (
+          <ArbitragePanel />
+        )}
+
+        {activeTab === 'marketplace' && (
+          <MarketplacePanel />
         )}
       </main>
 

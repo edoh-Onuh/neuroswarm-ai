@@ -62,6 +62,19 @@ export default function MarketplacePanel() {
     }
   ]);
 
+  const [showListingModal, setShowListingModal] = useState(false);
+  const [showRentalModal, setShowRentalModal] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<AgentListing | null>(null);
+
+  const handleListAgent = () => {
+    setShowListingModal(true);
+  };
+
+  const handleRentAgent = (agent: AgentListing) => {
+    setSelectedAgent(agent);
+    setShowRentalModal(true);
+  };
+
   const getRatingBadge = (rating: string) => {
     const badges = {
       legendary: { color: 'from-yellow-500 to-orange-500', icon: '👑', label: 'LEGENDARY' },
@@ -77,7 +90,10 @@ export default function MarketplacePanel() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">🏆 Agent Marketplace</h2>
-        <button className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors">
+        <button 
+          onClick={handleListAgent}
+          className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors"
+        >
           List Your Agent
         </button>
       </div>
@@ -132,7 +148,10 @@ export default function MarketplacePanel() {
                   <span className="text-sm text-gray-400">Reputation:</span>
                   <span className="text-sm font-semibold text-purple-400">{agent.reputation}</span>
                 </div>
-                <button className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors">
+                <button 
+                  onClick={() => handleRentAgent(agent)}
+                  className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors"
+                >
                   Rent Agent
                 </button>
               </div>
@@ -140,6 +159,151 @@ export default function MarketplacePanel() {
           );
         })}
       </div>
+
+      {/* List Agent Modal */}
+      {showListingModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-800 border border-white/10 rounded-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold">📋 List Your Agent</h3>
+              <button 
+                onClick={() => setShowListingModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Agent Name</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g., Elite Day Trader"
+                  className="w-full bg-gray-900 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-purple-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Rental Price (SOL/day)</label>
+                <input 
+                  type="number" 
+                  placeholder="5.0"
+                  step="0.1"
+                  className="w-full bg-gray-900 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-purple-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Description</label>
+                <textarea 
+                  placeholder="Describe your agent's capabilities..."
+                  rows={3}
+                  className="w-full bg-gray-900 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-purple-500 focus:outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button 
+                  onClick={() => setShowListingModal(false)}
+                  className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    // Handle listing submission
+                    alert('Agent listed successfully! 🎉');
+                    setShowListingModal(false);
+                  }}
+                  className="flex-1 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium transition-colors"
+                >
+                  List Agent
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rent Agent Modal */}
+      {showRentalModal && selectedAgent && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-800 border border-white/10 rounded-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold">🤝 Rent Agent</h3>
+              <button 
+                onClick={() => {
+                  setShowRentalModal(false);
+                  setSelectedAgent(null);
+                }}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+                <h4 className="font-semibold mb-2">{selectedAgent.name}</h4>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-400">Win Rate:</span>
+                  <span className="text-green-400 font-semibold">{selectedAgent.winRate}%</span>
+                </div>
+                <div className="flex items-center justify-between text-sm mt-1">
+                  <span className="text-gray-400">Avg ROI:</span>
+                  <span className="text-yellow-400 font-semibold">{selectedAgent.avgROI}%</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Rental Period (days)</label>
+                <input 
+                  type="number" 
+                  placeholder="7"
+                  min="1"
+                  defaultValue="7"
+                  className="w-full bg-gray-900 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-purple-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="bg-gray-900 border border-white/10 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-gray-400">Price per day:</span>
+                  <span className="font-semibold">{selectedAgent.rentalPrice} SOL</span>
+                </div>
+                <div className="flex items-center justify-between text-lg font-bold">
+                  <span>Total Cost:</span>
+                  <span className="text-purple-400">{(selectedAgent.rentalPrice * 7).toFixed(1)} SOL</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button 
+                  onClick={() => {
+                    setShowRentalModal(false);
+                    setSelectedAgent(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    // Handle rental submission
+                    alert(`Successfully rented ${selectedAgent.name}! 🎉`);
+                    setShowRentalModal(false);
+                    setSelectedAgent(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium transition-colors"
+                >
+                  Confirm Rental
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
         <div className="flex items-start gap-3">

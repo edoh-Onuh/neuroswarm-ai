@@ -1,18 +1,7 @@
 'use client'
 
 import { ThumbsUp, ThumbsDown, Clock, CheckCircle2 } from 'lucide-react'
-
-interface Proposal {
-  id: number
-  title: string
-  type: string
-  proposer: string
-  status: 'active' | 'passed' | 'rejected' | 'executed'
-  votesFor: number
-  votesAgainst: number
-  totalVotes: number
-  timeLeft: string
-}
+import type { Proposal } from '@/types'
 
 const MOCK_PROPOSALS: Proposal[] = [
   {
@@ -95,7 +84,7 @@ const getStatusColor = (status: string) => {
 
 interface ProposalListProps {
   limit?: number
-  onProposalClick?: (proposal: any) => void
+  onProposalClick?: (proposal: Proposal) => void
   searchQuery?: string
   onSearchChange?: (query: string) => void
 }

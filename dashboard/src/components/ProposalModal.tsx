@@ -1,10 +1,12 @@
 'use client'
 
 import { X, ThumbsUp, ThumbsDown, Clock, FileText, User, Copy, Check } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import type { Proposal } from '@/types'
+import { useDashboard } from '@/context/DashboardContext'
 
 interface ProposalModalProps {
-  proposal: any
+  proposal: Proposal
   onClose: () => void
   onVote: (vote: 'approve' | 'reject') => void
 }
@@ -13,6 +15,36 @@ export default function ProposalModal({ proposal, onClose, onVote }: ProposalMod
   const [copied, setCopied] = useState(false)
   const [voting, setVoting] = useState(false)
   const [selectedVote, setSelectedVote] = useState<'approve' | 'reject' | null>(null)
+  const modalRef = useRef<HTMLDivElement>(null)
+  const { addNotification } = useDashboard()
+
+  // Escape key and focus trap
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusable = modalRef.current.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+        if (focusable.length === 0) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
+    document.addEventListener('keydown', handleKey)
+    const closeBtn = modalRef.current?.querySelector<HTMLElement>('[aria-label="Close"]')
+    closeBtn?.focus()
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', handleKey)
+      document.body.style.overflow = ''
+    }
+  }, [onClose])
 
   const copyProposalId = () => {
     navigator.clipboard.writeText(`#${proposal.id}`)
@@ -23,9 +55,15 @@ export default function ProposalModal({ proposal, onClose, onVote }: ProposalMod
   const handleVote = (vote: 'approve' | 'reject') => {
     setSelectedVote(vote)
     setVoting(true)
+    // Simulate the vote then notify
     setTimeout(() => {
       onVote(vote)
       setVoting(false)
+      addNotification({
+        type: 'success',
+        title: `Vote ${vote === 'approve' ? 'Approved' : 'Rejected'}`,
+        message: `Your ${vote} vote on proposal #${proposal.id} has been recorded.`,
+      })
     }, 1500)
   }
 
@@ -37,8 +75,12 @@ export default function ProposalModal({ proposal, onClose, onVote }: ProposalMod
     <div 
       className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 animate-fadeIn overflow-y-auto"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Proposal #${proposal.id}: ${proposal.title}`}
     >
       <div 
+        ref={modalRef}
         className="bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900 rounded-2xl max-w-3xl w-full border border-solana-purple/30 shadow-2xl glow animate-slideUp my-4 sm:my-0 max-h-[95vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >

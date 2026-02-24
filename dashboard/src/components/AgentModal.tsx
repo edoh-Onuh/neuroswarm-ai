@@ -1,16 +1,49 @@
 'use client'
 
 import { X, Brain, TrendingUp, Award, Activity, Copy, Check, BarChart3, PieChart, Calendar, Target } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import type { Agent } from '@/types'
 
 interface AgentModalProps {
-  agent: any
+  agent: Agent
   onClose: () => void
 }
 
 export default function AgentModal({ agent, onClose }: AgentModalProps) {
   const [copied, setCopied] = useState(false)
   const [showAnalytics, setShowAnalytics] = useState(false)
+  const modalRef = useRef<HTMLDivElement>(null)
+
+  // Escape key and focus trap
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      // Focus trap
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusable = modalRef.current.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+        if (focusable.length === 0) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
+    document.addEventListener('keydown', handleKey)
+    // Focus close button on mount
+    const closeBtn = modalRef.current?.querySelector<HTMLElement>('[aria-label="Close"]')
+    closeBtn?.focus()
+    // Prevent body scroll
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', handleKey)
+      document.body.style.overflow = ''
+    }
+  }, [onClose])
 
   const copyAgentId = () => {
     navigator.clipboard.writeText(agent.id)
@@ -22,8 +55,12 @@ export default function AgentModal({ agent, onClose }: AgentModalProps) {
     <div 
       className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 animate-fadeIn overflow-y-auto"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${agent.name} details`}
     >
       <div 
+        ref={modalRef}
         className="bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900 rounded-2xl max-w-2xl w-full border border-solana-purple/30 shadow-2xl glow animate-slideUp my-4 sm:my-0 max-h-[95vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >

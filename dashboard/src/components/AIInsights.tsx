@@ -2,9 +2,10 @@
 
 import { Sparkles, TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import type { Insight } from '@/types'
 
 export default function AIInsights() {
-  const [insights, setInsights] = useState<any[]>([])
+  const [insights, setInsights] = useState<Insight[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -47,7 +48,7 @@ export default function AIInsights() {
       {isLoading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-20 bg-white/5 rounded-lg animate-pulse" />
+            <div key={i} className="h-20 skeleton rounded-lg" />
           ))}
         </div>
       ) : (

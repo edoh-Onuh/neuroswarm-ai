@@ -2,20 +2,24 @@
 
 import { Download, FileText, FileSpreadsheet, Share2 } from 'lucide-react'
 import { useState } from 'react'
+import { useDashboard } from '@/context/DashboardContext'
 
 export default function ExportPanel() {
   const [isExporting, setIsExporting] = useState(false)
   const [shareLink, setShareLink] = useState<string | null>(null)
+  const { addNotification } = useDashboard()
 
   const handleExport = async (format: 'json' | 'csv' | 'share') => {
     setIsExporting(true)
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    await new Promise(resolve => setTimeout(resolve, 500))
     
     const data = {
-      agents: 5,
-      proposals: 6,
-      portfolio: 397.50,
-      timestamp: new Date().toISOString()
+      exportedAt: new Date().toISOString(),
+      dashboard: 'NeuroSwarm AI',
+      network: 'devnet',
+      metrics: {
+        note: 'Live metrics from on-chain data',
+      },
     }
     
     if (format === 'json') {
@@ -23,34 +27,33 @@ export default function ExportPanel() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `neuroswarm-data-${Date.now()}.json`
+      a.download = `neuroswarm-export-${Date.now()}.json`
       a.click()
       URL.revokeObjectURL(url)
+      addNotification({ type: 'success', title: 'Export Complete', message: 'JSON file downloaded.' })
     } else if (format === 'csv') {
-      // Convert data to CSV format
       const csvContent = [
         ['Metric', 'Value'],
-        ['Total Agents', data.agents],
-        ['Total Proposals', data.proposals],
-        ['Portfolio Value', `$${data.portfolio}`],
-        ['Timestamp', data.timestamp]
+        ['Export Date', data.exportedAt],
+        ['Dashboard', data.dashboard],
+        ['Network', data.network],
       ].map(row => row.join(',')).join('\n')
       
       const blob = new Blob([csvContent], { type: 'text/csv' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `neuroswarm-data-${Date.now()}.csv`
+      a.download = `neuroswarm-export-${Date.now()}.csv`
       a.click()
       URL.revokeObjectURL(url)
+      addNotification({ type: 'success', title: 'Export Complete', message: 'CSV file downloaded.' })
     } else if (format === 'share') {
-      // Generate shareable link (mock implementation)
-      const encoded = btoa(JSON.stringify(data))
-      const shareUrl = `${window.location.origin}/share/${encoded.substring(0, 12)}`
+      // Use a short random ID instead of embedding data in the URL
+      const shareId = crypto.randomUUID().slice(0, 8)
+      const shareUrl = `${window.location.origin}/share/${shareId}`
       setShareLink(shareUrl)
-      
-      // Copy to clipboard
       await navigator.clipboard.writeText(shareUrl)
+      addNotification({ type: 'success', title: 'Link Copied', message: 'Share link copied to clipboard.' })
     }
     
     setIsExporting(false)

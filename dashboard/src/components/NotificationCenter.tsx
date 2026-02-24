@@ -2,13 +2,14 @@
 
 import { X, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react'
 import { useDashboard } from '@/context/DashboardContext'
+import type { Notification } from '@/types'
 
 export default function NotificationCenter() {
-  const { notifications, clearNotifications } = useDashboard()
+  const { notifications, dismissNotification } = useDashboard()
 
   if (notifications.length === 0) return null
 
-  const getIcon = (type: string) => {
+  const getIcon = (type: Notification['type']) => {
     switch (type) {
       case 'success': return <CheckCircle className="w-5 h-5 text-green-400" />
       case 'error': return <XCircle className="w-5 h-5 text-red-400" />
@@ -17,7 +18,7 @@ export default function NotificationCenter() {
     }
   }
 
-  const getColor = (type: string) => {
+  const getColor = (type: Notification['type']) => {
     switch (type) {
       case 'success': return 'border-green-500/50 bg-green-500/10'
       case 'error': return 'border-red-500/50 bg-red-500/10'
@@ -27,11 +28,12 @@ export default function NotificationCenter() {
   }
 
   return (
-    <div className="fixed top-20 right-4 z-50 space-y-2 max-w-md">
+    <div className="fixed top-20 right-4 z-50 space-y-2 max-w-md" role="region" aria-label="Notifications">
       {notifications.slice(0, 5).map((notification) => (
         <div
           key={notification.id}
           className={`p-4 rounded-lg border backdrop-blur-sm animate-slideIn ${getColor(notification.type)}`}
+          role="alert"
         >
           <div className="flex items-start space-x-3">
             {getIcon(notification.type)}
@@ -43,12 +45,19 @@ export default function NotificationCenter() {
               </p>
             </div>
             <button
-              onClick={clearNotifications}
+              onClick={() => dismissNotification(notification.id)}
               className="p-1 hover:bg-white/10 rounded transition-colors"
+              aria-label={`Dismiss ${notification.title}`}
             >
               <X className="w-4 h-4 text-gray-400" />
             </button>
           </div>
+          {/* Auto-dismiss progress bar for non-error notifications */}
+          {notification.type !== 'error' && (
+            <div className="mt-2 h-0.5 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full bg-white/30 animate-progress" />
+            </div>
+          )}
         </div>
       ))}
     </div>

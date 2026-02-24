@@ -1,16 +1,7 @@
 'use client'
 
 import { Brain, TrendingUp, Shield, Zap, BookOpen, CheckCircle, Activity } from 'lucide-react'
-
-interface Agent {
-  id: string
-  name: string
-  type: string
-  status: 'active' | 'idle' | 'voting'
-  reputation: number
-  votescast: number
-  successRate: number
-}
+import type { Agent } from '@/types'
 
 const MOCK_AGENTS: Agent[] = [
   {
@@ -80,13 +71,15 @@ const getStatusColor = (status: string) => {
   }
 }
 
+type AgentStatus = Agent['status'] | 'all'
+
 interface AgentGridProps {
   limit?: number
-  onAgentClick?: (agent: any) => void
+  onAgentClick?: (agent: Agent) => void
   searchQuery?: string
-  filterStatus?: 'all' | 'active' | 'idle' | 'voting'
+  filterStatus?: AgentStatus
   onSearchChange?: (query: string) => void
-  onFilterChange?: (status: 'all' | 'active' | 'idle' | 'voting') => void
+  onFilterChange?: (status: AgentStatus) => void
 }
 
 export default function AgentGrid({ 
@@ -137,7 +130,8 @@ export default function AgentGrid({
           />
           <select
             value={filterStatus}
-            onChange={(e) => onFilterChange(e.target.value as any)}
+            aria-label="Filter by status"
+            onChange={(e) => onFilterChange(e.target.value as AgentStatus)}
             className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-solana-purple transition-colors"
           >
             <option value="all">All Status</option>

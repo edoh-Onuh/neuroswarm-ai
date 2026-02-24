@@ -19,23 +19,24 @@ import AIInsights from '@/components/AIInsights'
 import SentimentPanel from '@/components/SentimentPanel'
 import ArbitragePanel from '@/components/ArbitragePanel'
 import MarketplacePanel from '@/components/MarketplacePanel'
-import { Activity, TrendingUp, Users, Vote, Loader2 } from 'lucide-react'
+import { Activity, TrendingUp, Users, Vote, Loader2, BarChart3, Building, Search, ArrowRightLeft, ShoppingBag } from 'lucide-react'
 import { useDashboard } from '@/context/DashboardContext'
+import type { Agent, Proposal } from '@/types'
 
 export default function Dashboard() {
-  const { isConnected: isDashboardConnected, isRefreshing } = useDashboard()
+  const { isConnected: isDashboardConnected, isRefreshing, refreshCounter, activeTab, setActiveTab } = useDashboard()
   const { rpc } = useSolana()
   const { isConnected: isWalletConnected, connectedAddress } = useWallet()
-  const [activeTab, setActiveTab] = useState<'overview' | 'agents' | 'proposals' | 'portfolio' | 'governance' | 'sentiment' | 'arbitrage' | 'marketplace'>('overview')
-  const [selectedAgent, setSelectedAgent] = useState<any>(null)
-  const [selectedProposal, setSelectedProposal] = useState<any>(null)
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
+  const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'idle' | 'voting'>('all')
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [swarmData, setSwarmData] = useState({
-    totalAgents: 5,
-    totalProposals: 6,
-    activeProposals: 2,
-    portfolioValue: 397.50,
+    totalAgents: 0,
+    totalProposals: 0,
+    activeProposals: 0,
+    portfolioValue: 0,
   })
 
   // Fetch swarm state using Kit RPC (no web3.js leakage)
@@ -52,6 +53,8 @@ export default function Dashboard() {
         }
       } catch (error) {
         console.error('Error fetching swarm state:', error)
+      } finally {
+        setIsInitialLoad(false)
       }
     }
 
@@ -59,17 +62,33 @@ export default function Dashboard() {
     // Poll every 30s (be respectful of public RPC rate limits)
     const interval = setInterval(fetchState, 30_000)
     return () => clearInterval(interval)
-  }, [rpc])
+  }, [rpc, refreshCounter])
+
+  // Keyboard shortcuts for tab switching
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      // Don't fire when inside an input/textarea or when modifier keys are pressed (except for Ctrl+K)
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+
+      switch (e.key.toLowerCase()) {
+        case 'r': e.preventDefault(); break // handled by DashboardContext
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [])
 
   const tabs = [
-    { id: 'overview' as const, label: 'Overview', icon: Activity },
+    { id: 'overview' as const, label: 'Overview', icon: BarChart3 },
     { id: 'agents' as const, label: 'Agents', icon: Users },
     { id: 'proposals' as const, label: 'Proposals', icon: Vote },
     { id: 'portfolio' as const, label: 'Portfolio', icon: TrendingUp },
-    { id: 'governance' as const, label: 'Governance', icon: Users },
-    { id: 'sentiment' as const, label: 'Sentiment', icon: TrendingUp },
-    { id: 'arbitrage' as const, label: 'Arbitrage', icon: Activity },
-    { id: 'marketplace' as const, label: 'Marketplace', icon: Users },
+    { id: 'governance' as const, label: 'Governance', icon: Building },
+    { id: 'sentiment' as const, label: 'Sentiment', icon: Search },
+    { id: 'arbitrage' as const, label: 'Arbitrage', icon: ArrowRightLeft },
+    { id: 'marketplace' as const, label: 'Marketplace', icon: ShoppingBag },
   ]
 
   return (
@@ -89,7 +108,7 @@ export default function Dashboard() {
       )}
       
       {/* Tabs */}
-      <div className="border-b border-white/10 overflow-x-auto">
+      <nav className="border-b border-white/10 overflow-x-auto" role="tablist" aria-label="Dashboard sections">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           <div className="flex space-x-4 sm:space-x-8 min-w-max sm:min-w-0">
             {tabs.map((tab) => {
@@ -97,6 +116,8 @@ export default function Dashboard() {
               return (
                 <button
                   key={tab.id}
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center space-x-1 sm:space-x-2 py-3 sm:py-4 px-1 sm:px-2 border-b-2 transition-colors whitespace-nowrap ${
                     activeTab === tab.id
@@ -111,63 +132,60 @@ export default function Dashboard() {
             })}
           </div>
         </div>
-      </div>
+      </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'overview' && (
-          <div className="space-y-8">
-            <MetricsPanel data={swarmData} />
-            
-            {/* AI Insights */}
-            <AIInsights />
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <AgentGrid limit={5} onAgentClick={setSelectedAgent} />
-              <ProposalList limit={6} onProposalClick={setSelectedProposal} />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 safe-bottom">
+        {/* Initial loading skeleton */}
+        {isInitialLoad ? (
+          <div className="space-y-8 animate-pulse">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map(i => <div key={i} className="h-28 skeleton rounded-xl" />)}
             </div>
-            
-            {/* Export Panel */}
-            <ExportPanel />
+            <div className="h-48 skeleton rounded-xl" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="h-80 skeleton rounded-xl" />
+              <div className="h-80 skeleton rounded-xl" />
+            </div>
           </div>
-        )}
+        ) : (
+          <>
+            {activeTab === 'overview' && (
+              <div className="space-y-8">
+                <MetricsPanel data={swarmData} />
+                <AIInsights />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <AgentGrid limit={5} onAgentClick={setSelectedAgent} />
+                  <ProposalList limit={6} onProposalClick={setSelectedProposal} />
+                </div>
+                <ExportPanel />
+              </div>
+            )}
 
-        {activeTab === 'agents' && (
-          <AgentGrid 
-            onAgentClick={setSelectedAgent}
-            searchQuery={searchQuery}
-            filterStatus={filterStatus}
-            onSearchChange={setSearchQuery}
-            onFilterChange={setFilterStatus}
-          />
-        )}
+            {activeTab === 'agents' && (
+              <AgentGrid 
+                onAgentClick={setSelectedAgent}
+                searchQuery={searchQuery}
+                filterStatus={filterStatus}
+                onSearchChange={setSearchQuery}
+                onFilterChange={setFilterStatus}
+              />
+            )}
 
-        {activeTab === 'proposals' && (
-          <ProposalList 
-            onProposalClick={setSelectedProposal}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-          />
-        )}
+            {activeTab === 'proposals' && (
+              <ProposalList 
+                onProposalClick={setSelectedProposal}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+              />
+            )}
 
-        {activeTab === 'portfolio' && (
-          <PortfolioChart />
-        )}
-
-        {activeTab === 'governance' && (
-          <GovernancePanel />
-        )}
-
-        {activeTab === 'sentiment' && (
-          <SentimentPanel />
-        )}
-
-        {activeTab === 'arbitrage' && (
-          <ArbitragePanel />
-        )}
-
-        {activeTab === 'marketplace' && (
-          <MarketplacePanel />
+            {activeTab === 'portfolio' && <PortfolioChart />}
+            {activeTab === 'governance' && <GovernancePanel />}
+            {activeTab === 'sentiment' && <SentimentPanel />}
+            {activeTab === 'arbitrage' && <ArbitragePanel />}
+            {activeTab === 'marketplace' && <MarketplacePanel />}
+          </>
         )}
       </main>
 
@@ -190,16 +208,16 @@ export default function Dashboard() {
       )}
 
       {/* Footer */}
-      <footer className="border-t border-white/10 mt-16">
+      <footer className="border-t border-white/10 mt-16 safe-bottom">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex justify-between items-center text-sm text-gray-400">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 text-sm text-gray-400">
             <div>
               <span className="font-semibold bg-gradient-to-r from-solana-purple to-solana-green bg-clip-text text-transparent">NeuroSwarm AI</span>
               {' '}- Autonomous Intelligence Protocol
             </div>
             <div className="flex items-center space-x-2">
-              <span className="inline-block w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-              <span>Connected to Devnet</span>
+              <span className={`inline-block w-2 h-2 rounded-full ${isDashboardConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></span>
+              <span>{isDashboardConnected ? 'Connected to Devnet' : 'Offline'}</span>
             </div>
           </div>
         </div>

@@ -1,460 +1,437 @@
-# 🤖 NeuroSwarm AI - Autonomous Intelligence Protocol
+# NeuroSwarm AI
 
-> **Advanced Multi-Agent Coordination System with Sentiment Analysis, Arbitrage Detection, Custom Agent Teams, and Agent Marketplace on Solana**
+> Multi-agent coordination protocol on Solana. Specialized AI agents reach consensus, propose strategies, and execute actions on-chain -- without human intervention.
 
-[![Solana](https://img.shields.io/badge/Solana-9945FF?style=for-the-badge&logo=solana&logoColor=white)](https://solana.com)
-[![Rust](https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactnative.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
----
-
-## 🌟 Superteam Open Innovation Submission
-
-**Submission for:** Superteam Open Innovation Track - Build Anything on Solana  
-**Built by:** Autonomous AI Agent (GitHub Copilot + Claude)  
-**Status:** 🟢 Fully Open Source
+**Program ID:** `56Vy8e8V4E6UZnsa6uDRg8HFiPwroz6nRKh7rm9xAfeK` (devnet)
 
 ---
 
-## 🎯 What is NeuroSwarm AI?
+## Table of Contents
 
-**NeuroSwarm AI** is the first fully autonomous multi-agent coordination system built on Solana. It demonstrates emergent intelligence through decentralized agent consensus, enabling multiple specialized AI agents to coordinate complex decision-making without human intervention.
-
-### The Innovation
-
-Traditional AI systems are centralized and opaque. NeuroSwarm AI is different:
-
-- **Fully On-Chain Coordination**: All agent decisions, votes, and executions are recorded on Solana
-- **Emergent Intelligence**: Complex behaviors emerge from simple agent interactions
-- **Trustless Verification**: Anyone can audit agent decision-making processes
-- **Autonomous Evolution**: Agents learn and adapt strategies based on performance
-- **Decentralized Consensus**: No single agent controls the system
-
-### Real-World Use Case: Autonomous DeFi Portfolio Manager
-
-The first implementation demonstrates a **fully autonomous DeFi portfolio management system** where 5 specialized agents coordinate to:
-
-1. Analyze market conditions and on-chain data
-2. Propose rebalancing strategies through consensus voting
-3. Execute trades across Solana DEXes
-4. Monitor risk parameters and enforce limits
-5. Learn from outcomes and adapt strategies
-
-**Zero human intervention required after initialization.**
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [On-Chain Program](#on-chain-program)
+- [Agent Framework](#agent-framework)
+- [Dashboard](#dashboard)
+- [SDK and Integrations](#sdk-and-integrations)
+- [Installation](#installation)
+- [Running](#running)
+- [Testing](#testing)
+- [Security](#security)
+- [Project Structure](#project-structure)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## 🏗️ Architecture
+## Overview
 
-### On-Chain Program (Rust)
+NeuroSwarm AI is a multi-agent swarm intelligence protocol built on Solana. It coordinates specialized AI agents through on-chain consensus -- agents register, propose actions, vote with Byzantine fault tolerance, execute approved strategies, and learn from outcomes.
 
-The Solana program manages:
-- **Agent Registry**: Register and authenticate agents
-- **Proposal System**: Agents submit strategy proposals
-- **Voting Mechanism**: Byzantine fault-tolerant consensus
-- **Execution Queue**: Ordered execution of approved actions
-- **Performance Tracking**: Historical agent decision outcomes
-- **Reputation System**: Agent reliability scores
+The reference implementation is an autonomous DeFi portfolio manager where agents analyze markets, propose rebalancing strategies, vote on them, execute trades via Solana DEXes, and adapt over time.
 
-### Agent Framework (Python)
+Key properties:
 
-Nine specialized autonomous agents:
-
-**Core Coordination Agents:**
-
-1. **🎯 Consensus Agent** (`consensus_agent.py`)
-   - Coordinates decision-making across agents
-   - Implements weighted voting based on reputation
-   - Resolves conflicts and ensures Byzantine fault tolerance
-
-2. **📊 Analytics Agent** (`analytics_agent.py`)
-   - Analyzes real-time Solana on-chain data
-   - Monitors DEX liquidity, volumes, and price movements
-   - Generates market insights and trend predictions
-
-3. **⚡ Execution Agent** (`execution_agent.py`)
-   - Executes approved transactions on Solana
-   - Manages transaction retries and confirmations
-   - Optimizes for low fees and fast execution
-
-4. **🛡️ Risk Management Agent** (`risk_agent.py`)
-   - Monitors portfolio risk metrics
-   - Enforces position limits and drawdown controls
-   - Can veto high-risk proposals
-
-5. **🧠 Learning Agent** (`learning_agent.py`)
-   - Analyzes historical performance
-   - Adapts strategies using reinforcement learning
-   - Updates agent models based on outcomes
-
-**Advanced Specialized Agents:**
-
-6. **💭 Sentiment Analysis Agent** (`sentiment_agent.py`)
-   - Analyzes market sentiment from Twitter, Reddit, and news
-   - Monitors on-chain sentiment indicators
-   - Classifies sentiment as bullish, bearish, or neutral
-   - Provides composite sentiment scores with confidence levels
-
-7. **💸 Arbitrage Agent** (`arbitrage_agent.py`)
-   - Detects cross-DEX arbitrage opportunities
-   - Monitors prices across Raydium, Orca, Jupiter, Lifinity, Meteora
-   - Calculates optimal trade sizes and profit potential
-   - Accounts for fees and slippage
-
-8. **🛠️ Custom Agent Builder** (`custom_agent_builder.py`)
-   - Create custom agent teams from templates
-   - 5 pre-built templates: Conservative, Aggressive, Sentiment Specialist, Arbitrage Hunter, DeFi Strategist
-   - Validate team composition and capabilities
-   - Export/import team configurations
-
-9. **🏪 Agent Marketplace** (`agent_marketplace.py`)
-   - List agents for rent with performance metrics
-   - Search and filter agents by capabilities, rating, and price
-   - Agent leaderboards with reputation scoring
-   - Performance tracking and reviews system
+- **On-chain coordination** -- all proposals, votes, and executions are recorded on Solana
+- **Byzantine fault tolerant** -- correct operation with up to 1/3 malicious agents
+- **Autonomous** -- no human intervention after initialization
+- **Transparent** -- full audit trail of every agent decision
+- **Extensible** -- custom agent types, pluggable strategies, SDK for building new swarms
 
 ---
 
-## 🚀 Key Features
+## Architecture
 
-### Autonomous Operation
-- **Self-Organizing**: Agents coordinate without central control
-- **Auto-Healing**: System continues if individual agents fail
-- **Continuous Learning**: Performance improves over time
-- **24/7 Operation**: No human supervision required
+```
++---------------------+      +---------------------+      +---------------------+
+|   Dashboard (Next)  | <--> |  Agent Framework    | <--> | On-Chain Program    |
+|   @solana/kit       |      |  (Python)           |      | (Anchor / Rust)     |
+|   Wallet Standard   |      |  9 specialized      |      | Agent registry      |
+|   Kit-native RPC    |      |  agents             |      | Proposal system     |
++---------------------+      +---------------------+      | Consensus voting    |
+                                                           | Reputation tracking |
+                                                           +---------------------+
+```
 
-### Transparent & Auditable
-- **All decisions on-chain**: Full transparency in decision-making
-- **Vote history**: Complete audit trail of agent votes
-- **Performance metrics**: Real-time agent effectiveness tracking
-- **Open source**: All code and logic publicly verifiable
+Three layers:
 
-### Robust & Secure
-- **Byzantine Fault Tolerance**: Operates correctly despite malicious agents
-- **Multi-signature execution**: Requires consensus for actions
-- **Risk limits**: Hard-coded safety constraints
-- **Graceful degradation**: Partial operation during failures
-
-### State-of-the-Art Technology
-- **GPT-4/Claude integration**: Advanced reasoning capabilities
-- **Real-time on-chain data**: Uses Solana RPC and DeFi APIs
-- **Reinforcement learning**: Continuous strategy optimization
-- **MEV protection**: Transaction ordering safeguards
+1. **Program layer** -- Anchor 0.29.0 Rust program deployed on Solana devnet. Manages agent registration, proposal lifecycle, BFT voting, execution, reputation, and outcome recording.
+2. **Agent layer** -- Python framework with 9 specialized agents (consensus, analytics, risk, learning, sentiment, arbitrage, custom builder, marketplace, enhanced learning). Each agent runs autonomously and interacts with the on-chain program.
+3. **Dashboard layer** -- Next.js 14 web application using `@solana/kit` for RPC, Wallet Standard for wallet connections, and a web3-compat adapter boundary for any legacy `@solana/web3.js` interop.
 
 ---
 
-## 📋 How Solana is Used
+## Tech Stack
 
-ASIP leverages Solana extensively:
-
-1. **Custom On-Chain Program**: Core coordination logic in Rust
-2. **Transaction Management**: All agent actions are Solana transactions
-3. **Account State**: Agent registry, proposals, votes stored on-chain
-4. **DeFi Integration**: Interacts with Jupiter, Orca, Raydium DEXes
-5. **Real-Time Data**: Monitors Solana blockchain for market data
-6. **Token Operations**: Manages SPL tokens in portfolio
-7. **Program Composability**: Leverages other Solana programs via CPI
-
----
-
-## 🤖 Agent Autonomy Demonstration
-
-### Planning Phase
-- Agents analyzed the Superteam bounty requirements
-- Designed multi-agent architecture autonomously
-- Selected DeFi portfolio management as demonstration use case
-- Defined agent roles and coordination protocols
-
-### Execution Phase
-- Implemented Solana program with agent coordination logic
-- Built 5 specialized agent implementations
-- Created consensus voting mechanism
-- Integrated with Solana DeFi ecosystem
-
-### Iteration Phase
-- Agents test strategies in simulation
-- Performance metrics trigger strategy updates
-- Learning agent proposes improvements
-- System evolves without human code changes
-
-### Human Involvement: Limited to
-- Initial bounty submission and requirements input
-- Code review and security validation (minimal)
-- Infrastructure setup (RPC endpoints, deployment)
-- Final submission documentation
-
-**All architectural decisions, implementation, and optimization performed autonomously by AI.**
+| Layer | Technology | Notes |
+|-------|-----------|-------|
+| On-chain program | Anchor 0.29.0, solana-program 1.18 | Rust, deployed to devnet |
+| Agent framework | Python 3.11+ | solana-py, solders, anchorpy, aiohttp |
+| Dashboard | Next.js 14, React 18, TypeScript 5 | Tailwind CSS |
+| Solana SDK (dashboard) | @solana/kit 2.1.0 | Kit-native RPC, Address, PDA derivation |
+| Wallet connection | @wallet-standard/app 1.1.0 | Wallet Standard discovery, no legacy adapters |
+| Legacy boundary | @solana/web3.js 1.87 | Isolated in `web3-compat-adapter.ts` only |
+| Client generation | Codama | Typed TS clients from Anchor IDL |
+| Rust unit tests | LiteSVM 0.3, Mollusk SVM 0.0.10 | Fast in-process tests |
+| Integration tests | Surfpool | Mirrors devnet state locally |
+| Governance | Coalition voting (5 methods) | Reputation-weighted |
+| DEX integration | Jupiter V6 API, CPI stubs for Raydium/Orca | |
 
 ---
 
-## 📦 Installation & Setup
+## On-Chain Program
+
+Location: `programs/agent_swarm/`
+
+The Anchor program exposes these instructions:
+
+| Instruction | Description |
+|-------------|-------------|
+| `initialize` | Create the swarm with max agents, quorum threshold, and proposal timeout |
+| `register_agent` | Register a new agent (Consensus, Analytics, Execution, RiskManagement, Learning, Governance, Security, Liquidity, Arbitrage, or Custom) |
+| `create_proposal` | Submit a proposal (Rebalance, Trade, RiskLimit, Strategy, Emergency) |
+| `vote_proposal` | Cast a vote (Approve, Reject, Abstain) with reasoning |
+| `execute_proposal` | Execute an approved proposal |
+| `update_reputation` | Update an agent's reputation score |
+| `record_outcome` | Record execution results for learning |
+
+Security hardening:
+
+- No floating-point arithmetic on-chain -- integer math for quorum and majority checks
+- Bounded voter vector (MAX_VOTERS = 20) with runtime enforcement
+- Compile-time program ID constants via `solana_program::pubkey!()` macro
+- Consistent program ID across `Anchor.toml` and `declare_id!()`
+
+---
+
+## Agent Framework
+
+Location: `agents/`
+
+Nine specialized agents, all extending `BaseAgent`:
+
+| Agent | File | Role |
+|-------|------|------|
+| Consensus | `consensus_agent.py` | Coordinates voting, resolves conflicts, enforces BFT |
+| Analytics | `analytics_agent.py` | Analyzes on-chain data, DEX metrics, market trends |
+| Risk Management | `risk_agent.py` | Monitors risk, enforces position limits, vetoes high-risk proposals |
+| Learning | `learning_agent.py` | Reinforcement learning (Q-learning) with strategy adaptation |
+| Enhanced Learning | `enhanced_learning_agent.py` | Extended learning with SQLite persistence |
+| Sentiment | `sentiment_agent.py` | Multi-source sentiment analysis (Twitter, Reddit, news, on-chain) |
+| Arbitrage | `arbitrage_agent.py` | Cross-DEX arbitrage detection across Raydium, Orca, Jupiter, Lifinity, Meteora |
+| Custom Builder | `custom_agent_builder.py` | Template-based agent team creation (5 templates) |
+| Marketplace | `agent_marketplace.py` | Agent listing, ratings, leaderboards, rent marketplace |
+
+Supporting modules:
+
+- `governance/coalition.py` -- Coalition voting with 5 methods and reputation weighting
+- `integrations/jupiter_client.py` -- Jupiter V6 API client for swap routing
+- `demos/portfolio_manager.py` -- Full portfolio management demonstration
+
+---
+
+## Dashboard
+
+Location: `dashboard/`
+
+Next.js 14 application aligned with Solana Foundation best practices (Jan 2026 playbook):
+
+- **@solana/kit** for all RPC interaction (no direct web3.js in components)
+- **Wallet Standard** via `@wallet-standard/app` for wallet discovery and connection
+- **Kit-native types** (`Address`, `Rpc`, `getProgramDerivedAddress`) throughout
+- **web3-compat-adapter.ts** as the single boundary file for any legacy web3.js interop
+- **Environment-driven config** -- RPC endpoints from `NEXT_PUBLIC_RPC_URL` (see `dashboard/.env.example`)
+
+Key files:
+
+| File | Purpose |
+|------|---------|
+| `src/lib/solana/client.ts` | Kit RPC factory, PDA derivation, account fetching |
+| `src/lib/solana/web3-compat-adapter.ts` | Legacy web3.js boundary adapter |
+| `src/context/SolanaContext.tsx` | Kit RPC provider for React tree |
+| `src/context/WalletContext.tsx` | Wallet Standard provider and `useWallet()` hook |
+| `src/components/WalletButton.tsx` | Connect/disconnect wallet UI |
+| `src/context/DashboardContext.tsx` | Dashboard state with real RPC health checks |
+
+Dashboard panels: agent grid, metrics, portfolio chart, arbitrage, sentiment, governance, marketplace, AI insights, notifications, command palette, export.
+
+---
+
+## SDK and Integrations
+
+- **Python SDK** (`sdk/python/agent_swarm_sdk/`) -- build custom agent swarms programmatically
+- **SDK examples** (`sdk/examples/custom_trading_swarm.py`) -- reference implementation
+- **Codama config** (`codama.config.mjs`) -- generates typed TypeScript clients from the Anchor IDL into `sdk/typescript/generated/`
+- **Surfpool config** (`surfpool.toml`) -- integration test runner mirroring devnet state
+
+---
+
+## Installation
 
 ### Prerequisites
 
-```bash
-# Solana CLI
-sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
+- Solana CLI (stable)
+- Rust and Cargo (via rustup)
+- Anchor CLI 0.29.0 (via avm)
+- Python 3.11+
+- Node.js 18+ and npm
 
-# Rust & Cargo
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Anchor Framework
-cargo install --git https://github.com/coral-xyz/anchor avm --locked
-avm install latest
-avm use latest
-
-# Python 3.11+
-python --version  # Should be 3.11 or higher
-```
-
-### Installation
+### Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/solana-agent-swarm
-cd solana-agent-swarm
+git clone https://github.com/edoh-Onuh/neuroswarm-ai.git
+cd neuroswarm-ai
 
 # Install Python dependencies
 pip install -r requirements.txt
 
 # Build the Solana program
-cd program
 anchor build
 
-# Deploy to devnet
-anchor deploy --provider.cluster devnet
+# Install dashboard dependencies
+cd dashboard
+npm install
+cd ..
 
-# Configure agents
-cd ../agents
-cp .env.example .env
-# Edit .env with your RPC endpoint and program ID
+# Install root test dependencies (for Anchor TS tests)
+npm install
 ```
 
-### Running the Agent Swarm
+### Environment Configuration
+
+```bash
+# Dashboard environment
+cp dashboard/.env.example dashboard/.env.local
+# Edit dashboard/.env.local with your RPC endpoint
+
+# Solana CLI configuration
+solana config set --url devnet
+```
+
+---
+
+## Running
+
+### Agent Swarm
 
 ```bash
 # Start all agents
 python run_swarm.py
 
 # Or start individual agents
-python agents/consensus_agent.py &
-python agents/analytics_agent.py &
-python agents/execution_agent.py &
-python agents/risk_agent.py &
-python agents/learning_agent.py &
+python agents/consensus_agent.py
+python agents/analytics_agent.py
+python agents/risk_agent.py
+python agents/learning_agent.py
+python agents/sentiment_agent.py
 ```
 
-### Monitoring
+### Dashboard
 
 ```bash
-# View agent coordination dashboard
-python dashboard/app.py
+cd dashboard
+npm run dev
+# Open http://localhost:3000
+```
 
-# Navigate to http://localhost:8050
+### Portfolio Manager Demo
+
+```bash
+# Full demo (requires RPC connection)
+python demos/portfolio_manager.py
+
+# Offline demo (simulated data)
+python demos/portfolio_manager_offline.py
 ```
 
 ---
 
-## 🧪 Demo & Testing
+## Testing
 
-### Simulation Mode
+### Rust Unit Tests (LiteSVM / Mollusk)
+
 ```bash
-# Run with simulated data (no real funds)
-python run_swarm.py --mode simulation
-
-# The agents will:
-# 1. Analyze simulated market data
-# 2. Propose and vote on strategies
-# 3. Execute mock transactions
-# 4. Display coordination metrics
+cd programs/agent_swarm
+cargo test
 ```
 
-### Live Demo
-- **Dashboard**: Real-time agent coordination visualization
-- **Metrics**: Agent voting patterns, consensus outcomes
-- **Performance**: Portfolio value over time
-- **Decisions**: Detailed decision logs with reasoning
+Tests are in `programs/agent_swarm/tests/litesvm_tests.rs` using LiteSVM for fast in-process SVM testing and Mollusk for instruction-level testing.
 
-### Test Suite
+### Anchor Integration Tests
+
 ```bash
-# Run comprehensive tests
+anchor test
+```
+
+Runs `tests/anchor_tests.ts` via ts-mocha against a local validator.
+
+### Surfpool Integration Tests
+
+```bash
+# Requires surfpool installed
+surfpool test
+```
+
+Uses `surfpool.toml` configuration to mirror devnet state and test against a local fork.
+
+### Python Tests
+
+```bash
 pytest tests/
+```
 
-# Specific test categories
-pytest tests/test_consensus.py      # Consensus mechanism
-pytest tests/test_byzantine.py      # Byzantine fault tolerance
-pytest tests/test_execution.py      # Transaction execution
-pytest tests/test_learning.py       # Learning algorithms
+### Codama Client Generation
+
+```bash
+# Generate typed TypeScript clients from the IDL
+npx codama run codama.config.mjs
+```
+
+Output goes to `sdk/typescript/generated/`.
+
+---
+
+## Security
+
+- **No floats on-chain** -- quorum and majority calculations use integer arithmetic
+- **Bounded data structures** -- voter vector capped at MAX_VOTERS (20) with runtime check
+- **Compile-time constants** -- program IDs use `solana_program::pubkey!()` (no runtime unwrap)
+- **Byzantine fault tolerance** -- correct operation with up to 1/3 faulty agents
+- **Consensus-gated execution** -- proposals require quorum approval before execution
+- **Risk limits** -- hard-coded position size and drawdown constraints
+- **Keypair hygiene** -- `.gitignore` blocks `keys/`, `*-keypair.json`, `id.json`; env vars for paths
+- **Isolated legacy code** -- all `@solana/web3.js` usage confined to a single adapter file
+
+See [SOLANA_BEST_PRACTICES.md](SOLANA_BEST_PRACTICES.md) for the full compliance guide.
+
+---
+
+## Project Structure
+
+```
+neuroswarm-ai/
+  programs/agent_swarm/        # Anchor program (Rust)
+    src/
+      lib.rs                   # Program entrypoint and instruction dispatch
+      state.rs                 # Account state (SwarmState, Agent, Proposal)
+      instructions/            # Instruction handlers
+      errors.rs                # Custom error types
+      constants.rs             # Protocol constants
+      cpi.rs                   # Cross-program invocation stubs
+    tests/
+      litesvm_tests.rs         # LiteSVM + Mollusk unit tests
+  agents/                      # Python agent framework
+    base_agent.py              # Base class for all agents
+    consensus_agent.py         # BFT consensus coordinator
+    analytics_agent.py         # Market data analysis
+    risk_agent.py              # Risk management
+    learning_agent.py          # Reinforcement learning
+    enhanced_learning_agent.py # Extended learning with persistence
+    sentiment_agent.py         # Sentiment analysis
+    arbitrage_agent.py         # Cross-DEX arbitrage detection
+    custom_agent_builder.py    # Template-based team builder
+    agent_marketplace.py       # Agent rental marketplace
+  dashboard/                   # Next.js 14 web dashboard
+    src/
+      app/                     # Next.js app router
+      components/              # UI components
+      context/                 # React context providers
+      lib/solana/              # Kit RPC client, PDA utils, web3 adapter
+  governance/                  # Coalition voting system
+  integrations/                # DEX clients (Jupiter)
+  sdk/                         # Python SDK + Codama TS generation
+  demos/                       # Portfolio manager demos
+  scripts/                     # Initialization and deployment scripts
+  tests/                       # Anchor integration tests
+  target/deploy/               # Built program artifacts
+  Anchor.toml                  # Anchor framework config
+  codama.config.mjs            # Codama typed client generation
+  surfpool.toml                # Surfpool integration test config
 ```
 
 ---
 
-## 📊 Evaluation Criteria Alignment
+## Roadmap
 
-### ✅ Degree of Agent Autonomy
-- **Planning**: Agents designed the system architecture
-- **Execution**: Agents implement and coordinate strategies
-- **Iteration**: Agents learn and improve without human code changes
-- **Decision Making**: 100% autonomous after initialization
+### Phase 1: Core Protocol -- Complete
 
-### ✅ Originality and Creativity
-- **Novel approach**: First multi-agent swarm coordination on Solana
-- **Emergent behavior**: Complex outcomes from simple agent rules
-- **Unique use case**: Autonomous DeFi coordination
-- **Innovation**: Combines blockchain, AI, and swarm intelligence
+- Multi-agent coordination framework
+- On-chain consensus mechanism with Byzantine fault tolerance
+- Agent registration and reputation tracking
+- Program deployed to Solana devnet
+- 5 core specialized agents (Consensus, Analytics, Execution, Risk, Learning)
+- Simulation environment
 
-### ✅ Quality of Execution
-- **Production-ready**: Comprehensive error handling
-- **Well-tested**: >90% code coverage
-- **Documented**: Extensive inline and API documentation
-- **Secure**: Audited consensus mechanisms
+### Phase 2: Expansion -- Complete
 
-### ✅ Effective Use of Solana
-- **Custom program**: Purpose-built coordination logic
-- **DeFi integration**: Real interactions with Solana DEXes
-- **On-chain state**: All decisions recorded transparently
-- **Performance**: Leverages Solana's speed and low costs
+- DeFi portfolio management demo
+- Custom agent types (Governance, Security, Liquidity, Arbitrage, Custom)
+- Cross-program invocation framework
+- Agent marketplace backend
+- Enhanced learning with Q-learning and SQLite persistence
+- Jupiter DEX integration (V6 API)
 
-### ✅ Clarity and Reproducibility
-- **Clear documentation**: Step-by-step setup
-- **Simulation mode**: Easy testing without funds
-- **Open source**: All code and data publicly available
-- **Active support**: Community Discord for questions
+### Phase 3: Ecosystem -- Complete
 
----
+- Python SDK for custom agent swarms
+- Coalition governance (5 voting methods, reputation system)
+- Sentiment analysis agent
+- Arbitrage detection agent
+- Custom agent builder with 5 templates
 
-## 🔒 Security Considerations
+### Phase 4: Best Practices Alignment -- Complete
 
-- **Byzantine Fault Tolerance**: System operates correctly with up to 1/3 malicious agents
-- **Multi-Signature Requirements**: Critical actions require consensus
-- **Risk Limits**: Hard-coded maximum position sizes and drawdowns
-- **Emergency Stop**: Ability to pause system if anomalies detected
-- **Audit Trail**: All decisions permanently recorded on-chain
-- **No Private Keys in Code**: Secure key management practices
+- Dashboard migrated to @solana/kit (framework-kit-first)
+- Wallet Standard connection (replaces legacy wallet adapters)
+- web3-compat adapter boundary pattern
+- On-chain security fixes (no floats, bounded vectors, compile-time pubkeys)
+- LiteSVM + Mollusk test setup
+- Codama typed client generation configured
+- Surfpool integration test runner configured
 
----
+### Phase 5: Planned
 
-## 📈 Performance Metrics
-
-*Note: Metrics from simulation mode. Live performance varies.*
-
-- **Consensus Time**: ~2-5 seconds average
-- **Transaction Success Rate**: 98.7%
-- **Agent Uptime**: 99.9%
-- **Decision Quality**: Improving over time via learning
-- **Risk-Adjusted Returns**: Outperforms simple strategies in backtests
+- Mainnet deployment with security audit
+- Full CPI integration with Orca and Raydium
+- Compute budget optimization for mainnet transactions
+- Token-2022 (Token Extensions) support
+- Mobile app (React Native scaffold exists in `mobile/`)
+- Enterprise features
 
 ---
 
-## 🗺️ Roadmap
-
-### Phase 1: Core Protocol ✅ **LIVE ON DEVNET**
-- ✅ Multi-agent coordination framework
-- ✅ On-chain consensus mechanism
-- ✅ Byzantine fault-tolerant voting system
-- ✅ Agent registration and reputation tracking
-- ✅ Program deployed to Solana devnet
-- ✅ All 5 core specialized agents implemented
-- ✅ Simulation environment and testing suite
-
-**Status**: Deployed at `56Vy8e8V4E6UZnsa6uDRg8HFiPwroz6nRKh7rm9xAfeK`
-
-### Phase 2: Expansion ✅ **COMPLETED Q1 2026**
-- ✅ DeFi portfolio management live demo (`demos/portfolio_manager.py`)
-- ✅ Support for custom agent types (Governance, Security, Liquidity, Arbitrage, Custom)
-- ✅ Cross-program invocation (CPI) framework (`programs/agent_swarm/src/cpi.rs`)
-- ✅ Agent marketplace backend (`agents/agent_marketplace.py`)
-- ✅ Enhanced learning algorithms (Q-learning with SQLite persistence)
-- ✅ Integration with Jupiter DEX (full V6 API client)
-- 🔄 Orca and Raydium integration (CPI framework ready, full clients pending)
-
-### Phase 3: Ecosystem ✅ **COMPLETED Q1 2026**
-- ✅ SDK for building custom agent swarms (`sdk/python/agent_swarm_sdk/`)
-- ✅ Governance by agent coalition (5 voting methods + reputation system)
-- 🔄 Integration with other Solana protocols (CPI framework extensible)
-- 🔄 Advanced AI model integration (framework ready, API calls pending)
-- 📋 Mainnet deployment with audits (devnet complete, audits required)
-
-### Phase 4: Advanced Features ✅ **COMPLETED Q1 2026**
-- ✅ Sentiment Analysis Agent with multi-source sentiment tracking
-- ✅ Arbitrage Detection Agent monitoring 5 DEXes
-- ✅ Custom Agent Builder with 5 pre-built templates
-- ✅ Agent Marketplace with ratings, reviews, and leaderboards
-- ✅ Advanced Dashboard UI with sentiment, arbitrage, and marketplace tabs
-- ✅ Mobile app scaffold (React Native) for on-the-go monitoring
-- ✅ Comprehensive documentation (ADVANCED_FEATURES.md)
-
-### Phase 5: Mobile & Enterprise 🔄 **IN PROGRESS Q1 2026**
-- ✅ React Native mobile app structure
-- 📋 iOS and Android builds
-- 📋 Push notifications for agent actions
-- 📋 Biometric authentication
-- 📋 Enterprise team management features
-- 📋 White-label agent swarm solutions
-
----
-
-## 🤝 Contributing
-
-This project was built autonomously by AI, but we welcome community contributions!
+## Contributing
 
 ```bash
-# Fork the repository
-git fork https://github.com/edoh-Onuh/solana-agent-swarm
+# Fork and clone
+git clone https://github.com/<your-username>/neuroswarm-ai.git
 
 # Create a feature branch
-git checkout -b feature/amazing-feature
+git checkout -b feature/your-feature
 
-# Make your changes and commit
-git commit -m "Add amazing feature"
+# Make changes, then commit and push
+git commit -m "Add your feature"
+git push origin feature/your-feature
 
-# Push and create pull request
-git push origin feature/amazing-feature
+# Open a pull request
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
-## 📄 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-**Open Source from Day 1** ✨
+MIT -- see [LICENSE](LICENSE).
 
 ---
 
-## 🙏 Acknowledgments
+## Links
 
-- **Solana Foundation**: For building an incredible blockchain
-- **Superteam**: For hosting the Open Innovation bounty
-- **AI Community**: For advancing autonomous agent technology
-- **DeFi Protocols**: Jupiter, Orca, Raydium for DEX infrastructure
-
----
-
-## 📞 Contact & Links
-
-- **GitHub**: [github.com/edoh-Onuh/solana-agent-swarm](https://github.com/edoh-Onuh/solana-agent-swarm)
-- **Documentation**: [docs.agentswarm.io](https://docs.agentswarm.io)
-- **Demo**: [demo.agentswarm.io](https://demo.agentswarm.io)
+- **Repository**: [github.com/edoh-Onuh/neuroswarm-ai](https://github.com/edoh-Onuh/neuroswarm-ai)
 - **X**: [@Adanubrown](https://X.com/Adanubrown)
-
----
-
-## 🌟 Why This Matters
-
-ASIP represents a glimpse into the future where:
-- AI agents coordinate autonomously on-chain
-- Trust is guaranteed by blockchain transparency
-- Complex systems emerge from simple agent rules
-- Financial operations run 24/7 without human oversight
-
-**Built by AI, for the future of autonomous on-chain intelligence.**
-
----
-
-*This project was conceived, designed, and implemented autonomously by AI agents as part of the Superteam Open Innovation Track.*

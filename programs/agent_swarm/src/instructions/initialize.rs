@@ -31,8 +31,9 @@ pub fn initialize(
         SwarmError::InvalidVoteCount
     );
 
+    // Integer majority: at least ceil(max_agents / 2)
     require!(
-        min_votes_required >= (max_agents as f32 * 0.51) as u8,
+        min_votes_required >= ((max_agents as u16 + 1) / 2) as u8,
         SwarmError::MinAgentsNotMet
     );
 

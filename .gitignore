@@ -35,10 +35,13 @@ test-ledger/
 .DS_Store
 Thumbs.db
 
-# Keys (IMPORTANT: Never commit private keys!)
-keys/*.json
+# Keys (CRITICAL: Never commit private keys!)
+keys/
 *.pem
 *.key
+*-keypair.json
+*.keypair
+id.json
 
 # Logs
 *.log
@@ -53,6 +56,10 @@ package-lock.json
 dist/
 build/
 *.wasm
+sdk/typescript/generated/
+
+# Surfpool test state
+.surfpool/
 
 # Environment
 .env.local

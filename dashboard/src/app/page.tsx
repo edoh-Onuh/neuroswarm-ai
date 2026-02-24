@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Connection, PublicKey } from '@solana/web3.js'
+import { useSolana } from '@/context/SolanaContext'
+import { useWallet } from '@/context/WalletContext'
+import { fetchSwarmState, type SwarmStateData } from '@/lib/solana/client'
 import AgentGrid from '@/components/AgentGrid'
 import ProposalList from '@/components/ProposalList'
 import MetricsPanel from '@/components/MetricsPanel'
@@ -20,12 +22,10 @@ import MarketplacePanel from '@/components/MarketplacePanel'
 import { Activity, TrendingUp, Users, Vote, Loader2 } from 'lucide-react'
 import { useDashboard } from '@/context/DashboardContext'
 
-const PROGRAM_ID = '56Vy8e8V4E6UZnsa6uDRg8HFiPwroz6nRKh7rm9xAfeK'
-const RPC_URL = 'https://api.devnet.solana.com'
-
 export default function Dashboard() {
-  const { isConnected, isRefreshing } = useDashboard()
-  const [connection] = useState(() => new Connection(RPC_URL, 'confirmed'))
+  const { isConnected: isDashboardConnected, isRefreshing } = useDashboard()
+  const { rpc } = useSolana()
+  const { isConnected: isWalletConnected, connectedAddress } = useWallet()
   const [activeTab, setActiveTab] = useState<'overview' | 'agents' | 'proposals' | 'portfolio' | 'governance' | 'sentiment' | 'arbitrage' | 'marketplace'>('overview')
   const [selectedAgent, setSelectedAgent] = useState<any>(null)
   const [selectedProposal, setSelectedProposal] = useState<any>(null)
@@ -38,30 +38,28 @@ export default function Dashboard() {
     portfolioValue: 397.50,
   })
 
+  // Fetch swarm state using Kit RPC (no web3.js leakage)
   useEffect(() => {
-    // Fetch swarm state periodically
-    const fetchSwarmState = async () => {
+    const fetchState = async () => {
       try {
-        const programId = new PublicKey(PROGRAM_ID)
-        const [swarmPda] = PublicKey.findProgramAddressSync(
-          [Buffer.from('swarm')],
-          programId
-        )
-        
-        const accountInfo = await connection.getAccountInfo(swarmPda)
-        if (accountInfo) {
-          // Parse account data (simplified)
-          console.log('Swarm account found:', swarmPda.toString())
+        const state = await fetchSwarmState(rpc)
+        if (state) {
+          setSwarmData((prev) => ({
+            ...prev,
+            totalAgents: state.activeAgents,
+            totalProposals: Number(state.totalProposals),
+          }))
         }
       } catch (error) {
         console.error('Error fetching swarm state:', error)
       }
     }
 
-    fetchSwarmState()
-    const interval = setInterval(fetchSwarmState, 10000)
+    fetchState()
+    // Poll every 30s (be respectful of public RPC rate limits)
+    const interval = setInterval(fetchState, 30_000)
     return () => clearInterval(interval)
-  }, [connection])
+  }, [rpc])
 
   const tabs = [
     { id: 'overview' as const, label: 'Overview', icon: Activity },

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Brain, Github, ExternalLink, Copy, Check, RefreshCw, Bell, Settings } from 'lucide-react'
 import { useDashboard } from '@/context/DashboardContext'
+import WalletButton from '@/components/WalletButton'
 
 interface HeaderProps {
   onOpenSettings?: () => void
@@ -78,6 +79,9 @@ export default function Header({ onOpenSettings }: HeaderProps = {}) {
             >
               <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 hover:text-white transition-colors" />
             </button>
+
+            {/* Wallet Connect (Wallet Standard) */}
+            <WalletButton />
 
             {/* Connection Status */}
             <div className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-2 ${

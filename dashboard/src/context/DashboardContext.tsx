@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 
 interface DashboardContextType {
   isConnected: boolean
@@ -25,19 +25,33 @@ interface Notification {
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined)
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
-  const [isConnected, setIsConnected] = useState(true)
+  const [isConnected, setIsConnected] = useState(false)
   const [lastUpdate, setLastUpdate] = useState(Date.now())
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Simulate real-time connection
+  // Real RPC health check instead of Math.random() simulation
   useEffect(() => {
-    const interval = setInterval(() => {
-      setLastUpdate(Date.now())
-      setIsConnected(Math.random() > 0.1) // 90% uptime simulation
-    }, 5000)
+    const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL ?? 'https://api.devnet.solana.com'
 
+    const checkHealth = async () => {
+      try {
+        const res = await fetch(rpcUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getHealth' }),
+        })
+        const json = await res.json()
+        setIsConnected(json.result === 'ok')
+      } catch {
+        setIsConnected(false)
+      }
+      setLastUpdate(Date.now())
+    }
+
+    checkHealth()
+    const interval = setInterval(checkHealth, 30_000) // 30s, respectful of rate limits
     return () => clearInterval(interval)
   }, [])
 

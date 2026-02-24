@@ -102,29 +102,35 @@ impl CPIHelper {
 /// Whirlpool (Orca) integration helpers
 pub mod whirlpool {
     use super::*;
-    
+
+    /// Orca Whirlpool program ID (compile-time constant — no runtime unwrap)
+    pub const PROGRAM_ID: Pubkey = solana_program::pubkey!("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc");
+
     pub fn get_whirlpool_program_id() -> Pubkey {
-        // Orca Whirlpool program ID
-        Pubkey::from_str("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc").unwrap()
+        PROGRAM_ID
     }
 }
 
 /// Raydium integration helpers
 pub mod raydium {
     use super::*;
-    
+
+    /// Raydium AMM V4 program ID (compile-time constant — no runtime unwrap)
+    pub const PROGRAM_ID: Pubkey = solana_program::pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
+
     pub fn get_raydium_v4_program_id() -> Pubkey {
-        // Raydium AMM V4 program ID
-        Pubkey::from_str("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8").unwrap()
+        PROGRAM_ID
     }
 }
 
 /// Jupiter integration helpers
 pub mod jupiter {
     use super::*;
-    
+
+    /// Jupiter V6 aggregator program ID (compile-time constant — no runtime unwrap)
+    pub const PROGRAM_ID: Pubkey = solana_program::pubkey!("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
+
     pub fn get_jupiter_v6_program_id() -> Pubkey {
-        // Jupiter V6 aggregator program ID
-        Pubkey::from_str("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4").unwrap()
+        PROGRAM_ID
     }
 }

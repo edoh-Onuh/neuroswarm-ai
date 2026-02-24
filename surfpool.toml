@@ -1,0 +1,29 @@
+# Surfpool Configuration — Integration Tests
+#
+# Surfpool provides realistic cluster state locally by mirroring mainnet/devnet
+# accounts. Use this for integration tests that need real token mints, AMM pools, etc.
+#
+# Install: cargo install surfpool
+# Run:     surfpool start --config surfpool.toml
+
+[network]
+# Mirror devnet state for integration testing
+source = "devnet"
+rpc_url = "https://api.devnet.solana.com"
+
+[local]
+rpc_port = 8899
+ws_port = 8900
+
+[programs]
+# Deploy the local agent_swarm program
+[[programs.deploy]]
+name = "agent_swarm"
+program_id = "56Vy8e8V4E6UZnsa6uDRg8HFiPwroz6nRKh7rm9xAfeK"
+so_path = "target/deploy/agent_swarm.so"
+
+[accounts]
+# Mirror specific accounts from devnet if needed
+# [[accounts.mirror]]
+# address = "..."
+# source = "devnet"

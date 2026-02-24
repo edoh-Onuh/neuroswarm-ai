@@ -23,4 +23,5 @@ pub const INITIAL_REPUTATION: u16 = 1000;
 pub const MIN_REPUTATION: u16 = 0;
 pub const MAX_REPUTATION: u16 = 10000;
 
-pub const BYZANTINE_FAULT_TOLERANCE: f32 = 0.33; // Can tolerate up to 1/3 malicious agents
+pub const BYZANTINE_FAULT_TOLERANCE_NUMERATOR: u8 = 1;   // Can tolerate up to 1/3 malicious agents
+pub const BYZANTINE_FAULT_TOLERANCE_DENOMINATOR: u8 = 3;

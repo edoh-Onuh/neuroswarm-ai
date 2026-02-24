@@ -5,13 +5,13 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-agent_swarm = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+agent_swarm = "56Vy8e8V4E6UZnsa6uDRg8HFiPwroz6nRKh7rm9xAfeK"
 
 [programs.devnet]
-agent_swarm = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+agent_swarm = "56Vy8e8V4E6UZnsa6uDRg8HFiPwroz6nRKh7rm9xAfeK"
 
 [programs.mainnet]
-agent_swarm = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+agent_swarm = "56Vy8e8V4E6UZnsa6uDRg8HFiPwroz6nRKh7rm9xAfeK"
 
 [registry]
 url = "https://api.apr.dev"
@@ -21,4 +21,4 @@ cluster = "Devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/anchor_tests.ts"

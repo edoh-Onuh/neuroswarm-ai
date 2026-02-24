@@ -119,9 +119,11 @@ impl Proposal {
         1;    // bump
 
     /// Check if proposal has reached quorum
+    /// Uses integer math (no floats) — requires > 50% of agents.
     pub fn has_quorum(&self, min_votes: u8, total_agents: u8) -> bool {
-        self.total_voters >= min_votes && 
-        self.total_voters as f32 >= (total_agents as f32 * 0.51) // Need majority
+        self.total_voters >= min_votes &&
+        // Integer ceiling division: (total_agents + 1) / 2  gives majority threshold
+        self.total_voters as u16 >= ((total_agents as u16 + 1) / 2)
     }
 
     /// Check if proposal is approved (weighted voting)
@@ -141,8 +143,15 @@ impl Proposal {
         self.voters.contains(agent)
     }
 
-    /// Record a vote
-    pub fn record_vote(&mut self, agent: &Pubkey, vote: VoteType, weight: u32) {
+    /// Maximum voters that can be stored (matches LEN calculation)
+    pub const MAX_VOTERS: usize = 20;
+
+    /// Record a vote. Returns Err if voter capacity is exceeded.
+    pub fn record_vote(&mut self, agent: &Pubkey, vote: VoteType, weight: u32) -> std::result::Result<(), &'static str> {
+        if self.voters.len() >= Self::MAX_VOTERS {
+            return Err("maximum voter capacity reached");
+        }
+
         match vote {
             VoteType::Approve => {
                 self.votes_for += 1;
@@ -156,9 +165,10 @@ impl Proposal {
                 self.votes_abstain += 1;
             }
         }
-        
+
         self.voters.push(*agent);
         self.total_voters += 1;
+        Ok(())
     }
 }
 

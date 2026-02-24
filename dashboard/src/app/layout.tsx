@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { DashboardProvider } from '@/context/DashboardContext'
+import { SolanaProvider } from '@/context/SolanaContext'
+import { WalletStandardProvider } from '@/context/WalletContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -26,9 +28,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <DashboardProvider>
-          {children}
-        </DashboardProvider>
+        <SolanaProvider cluster="devnet">
+          <WalletStandardProvider>
+            <DashboardProvider>
+              {children}
+            </DashboardProvider>
+          </WalletStandardProvider>
+        </SolanaProvider>
       </body>
     </html>
   )

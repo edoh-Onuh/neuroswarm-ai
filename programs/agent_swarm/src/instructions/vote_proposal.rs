@@ -56,7 +56,9 @@ pub fn vote_proposal(
     );
 
     let vote_weight = agent.vote_weight();
-    proposal.record_vote(&ctx.accounts.voter.key(), vote.clone(), vote_weight);
+    proposal
+        .record_vote(&ctx.accounts.voter.key(), vote.clone(), vote_weight)
+        .map_err(|_| SwarmError::MaxAgentsReached)?;
 
     agent.votes_cast += 1;
     agent.last_active = clock.unix_timestamp;

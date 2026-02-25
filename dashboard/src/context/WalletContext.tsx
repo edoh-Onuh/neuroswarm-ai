@@ -47,6 +47,8 @@ interface WalletContextValue {
   error: string | null
   /** Connect to a specific wallet */
   connect: (wallet: Wallet) => Promise<void>
+  /** Cancel an in-progress connection attempt */
+  cancelConnect: () => void
   /** Disconnect the current wallet */
   disconnect: () => void
 }
@@ -73,6 +75,7 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
   const [isConnecting, setIsConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const changeUnsubRef = useRef<(() => void) | null>(null)
+  const connectingRef = useRef(false)
 
   // Discover wallets via Wallet Standard
   useEffect(() => {
@@ -129,6 +132,7 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
 
   const connect = useCallback(async (wallet: Wallet) => {
     setIsConnecting(true)
+    connectingRef.current = true
     setError(null)
     try {
       const feature = wallet.features['standard:connect'] as
@@ -139,7 +143,16 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
         throw new Error(`Wallet "${wallet.name}" does not support standard:connect`)
       }
 
-      const result = await feature.connect()
+      // Wrap with a 30s timeout so isConnecting never hangs forever
+      const result = await Promise.race([
+        feature.connect(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Connection timed out — check your wallet popup')), 30_000)
+        ),
+      ])
+
+      // Bail out if user cancelled while awaiting
+      if (!connectingRef.current) return
 
       // Some wallets return accounts in result, others update wallet.accounts
       const accounts = (result?.accounts?.length ? result.accounts : wallet.accounts)
@@ -153,15 +166,24 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
         throw new Error('No accounts returned — connection may have been rejected')
       }
     } catch (err) {
+      if (!connectingRef.current) return // silent bail on cancel
       const message = err instanceof Error ? err.message : 'Connection failed'
       console.error('[Wallet] Connection failed:', message)
       setError(message)
       setSelectedWallet(null)
       setConnectedAccount(null)
     } finally {
+      connectingRef.current = false
       setIsConnecting(false)
     }
   }, [subscribeToWalletEvents])
+
+  const cancelConnect = useCallback(() => {
+    connectingRef.current = false
+    setIsConnecting(false)
+    setError(null)
+    console.log('[Wallet] Connection cancelled')
+  }, [])
 
   const disconnect = useCallback(() => {
     if (selectedWallet) {
@@ -207,9 +229,10 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
       isConnecting,
       error,
       connect,
+      cancelConnect,
       disconnect,
     }),
-    [wallets, selectedWallet, connectedAccount, connectedAddress, isConnecting, error, connect, disconnect],
+    [wallets, selectedWallet, connectedAccount, connectedAddress, isConnecting, error, connect, cancelConnect, disconnect],
   )
 
   return (

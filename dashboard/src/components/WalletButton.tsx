@@ -20,10 +20,12 @@ export default function WalletButton() {
     selectedWallet,
     error,
     connect,
+    cancelConnect,
     disconnect,
   } = useWallet()
 
   const [showDropdown, setShowDropdown] = useState(false)
+  const [connectingWallet, setConnectingWallet] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown on outside click
@@ -85,15 +87,21 @@ export default function WalletButton() {
   return (
     <div className="relative" ref={dropdownRef}>
       <button
-        onClick={() => setShowDropdown(!showDropdown)}
-        disabled={isConnecting}
-        className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-gradient-to-r from-solana-purple to-solana-green text-white font-medium text-sm hover:opacity-90 transition-all disabled:opacity-50"
+        onClick={() => {
+          if (isConnecting) {
+            // Allow cancelling by reopening the dropdown
+            setShowDropdown(true)
+          } else {
+            setShowDropdown(!showDropdown)
+          }
+        }}
+        className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-gradient-to-r from-solana-purple to-solana-green text-white font-medium text-sm hover:opacity-90 transition-all"
       >
-        <Wallet className="w-4 h-4" />
-        <span>{isConnecting ? 'Connecting...' : 'Connect Wallet'}</span>
+        <Wallet className={`w-4 h-4 ${isConnecting ? 'animate-pulse' : ''}`} />
+        <span>{isConnecting ? `Connecting${connectingWallet ? ` to ${connectingWallet}` : ''}…` : 'Connect Wallet'}</span>
       </button>
 
-      {showDropdown && !isConnecting && (
+      {showDropdown && (
         <div className="absolute right-0 mt-2 w-64 bg-gray-900 border border-white/10 rounded-lg shadow-xl z-50">
           <div className="p-3 border-b border-white/10">
             <p className="text-sm text-gray-400">Select a wallet</p>
@@ -103,6 +111,24 @@ export default function WalletButton() {
           {error && (
             <div className="px-3 py-2 bg-red-500/10 border-b border-red-500/20">
               <p className="text-xs text-red-400">{error}</p>
+            </div>
+          )}
+
+          {/* Connecting spinner / cancel prompt */}
+          {isConnecting && (
+            <div className="px-3 py-2 bg-solana-purple/10 border-b border-solana-purple/20 flex items-center justify-between">
+              <p className="text-xs text-solana-purple animate-pulse">Waiting for wallet approval…</p>
+              <button
+                onClick={() => {
+                  // Force-reset the connecting state so user isn't stuck
+                  setConnectingWallet(null)
+                  setShowDropdown(false)
+                  cancelConnect()
+                }}
+                className="text-xs text-gray-400 hover:text-white ml-2 underline"
+              >
+                Cancel
+              </button>
             </div>
           )}
 
@@ -134,10 +160,18 @@ export default function WalletButton() {
               {wallets.map((wallet) => (
                 <button
                   key={wallet.name}
+                  disabled={isConnecting}
                   onClick={async () => {
-                    await connect(wallet)
-                    // Only close if connection succeeded (error state handles failure)
-                    if (!error) setShowDropdown(false)
+                    setConnectingWallet(wallet.name)
+                    try {
+                      await connect(wallet)
+                      // connect() resolves only on success; errors are caught inside context
+                      setShowDropdown(false)
+                    } catch {
+                      // error is set in context; keep dropdown open so user sees it
+                    } finally {
+                      setConnectingWallet(null)
+                    }
                   }}
                   className="w-full flex items-center space-x-3 px-3 py-2 hover:bg-white/5 transition-colors"
                 >

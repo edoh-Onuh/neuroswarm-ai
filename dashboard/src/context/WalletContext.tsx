@@ -1,12 +1,15 @@
 /**
- * Wallet Provider — hybrid Wallet Standard + window.phantom fallback
+ * WalletContext — Phantom-first wallet connection
  *
- * Strategy:
- *  1. Primary: Wallet Standard getWallets() — discovers all compliant wallets.
- *  2. Fallback: window.phantom.solana / window.solana — handles timing issues
- *     where Phantom's Wallet Standard registration fires before React hydrates
- *     in Next.js (resulting in getWallets().get() returning []).
- *  3. Retry: re-checks Wallet Standard after 800 ms for late registrations.
+ * Connection priority:
+ *   1. window.phantom.solana  — Phantom injected (most reliable)
+ *   2. window.solflare        — Solflare injected
+ *   3. Wallet Standard        — any other compliant wallet (Backpack, etc.)
+ *
+ * Why not Wallet Standard for Phantom? Phantom's WS implementation sometimes
+ * returns empty accounts[] on connect() and delivers the real accounts via a
+ * subsequent 'change' event. Using the injected provider directly sidesteps
+ * the race and always works on the first try.
  */
 
 'use client'
@@ -23,19 +26,9 @@ import {
 } from 'react'
 import { getWallets } from '@wallet-standard/app'
 import type { Wallet, WalletAccount } from '@wallet-standard/base'
-import type { Address } from '@solana/kit'
 
-// ─── Window types (Phantom legacy API) ───────────────────────────────
-declare global {
-  interface Window {
-    phantom?: {
-      solana?: LegacyProvider
-    }
-    solana?: LegacyProvider
-    solflare?: LegacyProvider
-  }
-}
-interface LegacyProvider {
+// ─── Window / injected provider types ────────────────────────────────
+interface InjectedProvider {
   isPhantom?: boolean
   isSolflare?: boolean
   publicKey?: { toString(): string } | null
@@ -45,265 +38,265 @@ interface LegacyProvider {
   removeListener(event: string, cb: (...args: unknown[]) => void): void
 }
 
-// ─── Synthetic Wallet wrapping a legacy window.* provider ────────────
-class LegacyWallet implements Wallet {
-  readonly version = '1.0.0' as const
-  readonly name: string
-  readonly icon: `data:image/${string}` | `https://${string}`
-  readonly chains = ['solana:mainnet', 'solana:devnet', 'solana:testnet'] as const
-  readonly accounts: WalletAccount[] = []
-  readonly features: Record<string, unknown>
-
-  private _provider: LegacyProvider
-  private _connectFn: (wallet: LegacyWallet) => Promise<void>
-  private _disconnectFn: (wallet: LegacyWallet) => void
-
-  constructor(
-    name: string,
-    icon: `data:image/${string}` | `https://${string}`,
-    provider: LegacyProvider,
-    connectFn: (wallet: LegacyWallet) => Promise<void>,
-    disconnectFn: (wallet: LegacyWallet) => void,
-  ) {
-    this.name = name
-    this.icon = icon
-    this._provider = provider
-    this._connectFn = connectFn
-    this._disconnectFn = disconnectFn
-    this.features = {
-      'legacy:connect': {
-        connect: () => this._connectFn(this),
-      },
-      'legacy:disconnect': {
-        disconnect: () => this._disconnectFn(this),
-      },
-    }
+declare global {
+  interface Window {
+    phantom?: { solana?: InjectedProvider }
+    solana?: InjectedProvider & { isPhantom?: boolean }
+    solflare?: InjectedProvider
   }
-
-  get provider() { return this._provider }
 }
 
-// ─── Context types ────────────────────────────────────────────────────
+// ─── Wallet descriptor ────────────────────────────────────────────────
+// Simpler than implementing the full Wallet Standard interface.
+interface WalletEntry {
+  name: string
+  icon: string
+  kind: 'injected' | 'standard'
+  provider?: InjectedProvider      // set when kind === 'injected'
+  wsWallet?: Wallet                // set when kind === 'standard'
+}
 
+// ─── Context value ────────────────────────────────────────────────────
 interface WalletContextValue {
-  wallets: readonly Wallet[]
-  selectedWallet: Wallet | null
-  connectedAccount: WalletAccount | null
-  connectedAddress: Address | null
+  wallets: WalletEntry[]
+  selectedWallet: WalletEntry | null
+  connectedAddress: string | null
   isConnected: boolean
   isConnecting: boolean
   error: string | null
-  connect: (wallet: Wallet) => Promise<void>
+  connect: (wallet: WalletEntry) => Promise<void>
   cancelConnect: () => void
   disconnect: () => void
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null)
 
-// ─── Helpers ──────────────────────────────────────────────────────────
-
-function isSolanaWallet(wallet: Wallet): boolean {
-  return (
-    'solana:signTransaction' in wallet.features ||
-    'solana:signAndSendTransaction' in wallet.features ||
-    'standard:connect' in wallet.features
-  )
-}
-
-const PHANTOM_ICON =
-  'https://www.phantom.app/img/phantom-logo.png' as `https://${string}`
-const SOLFLARE_ICON =
-  'https://solflare.com/assets/logo.svg' as `https://${string}`
-
 // ─── Provider ─────────────────────────────────────────────────────────
-
 export function WalletStandardProvider({ children }: { children: ReactNode }) {
-  const [wallets, setWallets] = useState<readonly Wallet[]>([])
-  const [selectedWallet, setSelectedWallet] = useState<Wallet | null>(null)
-  const [connectedAccount, setConnectedAccount] = useState<WalletAccount | null>(null)
+  const [wallets, setWallets] = useState<WalletEntry[]>([])
+  const [selectedWallet, setSelectedWallet] = useState<WalletEntry | null>(null)
+  const [connectedAddress, setConnectedAddress] = useState<string | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const changeUnsubRef = useRef<(() => void) | null>(null)
   const connectingRef = useRef(false)
+  const unsubRef = useRef<(() => void) | null>(null)
 
   // ── Wallet discovery ──────────────────────────────────────────────
-  const buildLegacyWallets = useCallback(
-    (
-      connectLegacy: (wallet: LegacyWallet) => Promise<void>,
-      disconnectLegacy: (wallet: LegacyWallet) => void,
-    ): LegacyWallet[] => {
-      if (typeof window === 'undefined') return []
-      const out: LegacyWallet[] = []
-      const phantom = window.phantom?.solana ?? (window.solana?.isPhantom ? window.solana : null)
-      if (phantom) {
-        out.push(new LegacyWallet('Phantom', PHANTOM_ICON, phantom, connectLegacy, disconnectLegacy))
-      }
-      if (window.solflare) {
-        out.push(new LegacyWallet('Solflare', SOLFLARE_ICON, window.solflare, connectLegacy, disconnectLegacy))
-      }
-      return out
-    },
-    [],
-  )
-
-  const connectLegacy = useCallback(async (wallet: LegacyWallet) => {
-    const provider = wallet.provider
-    const result = await Promise.race([
-      provider.connect(),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Connection timed out — check your wallet popup')), 30_000),
-      ),
-    ])
-    const address = result.publicKey.toString() as Address
-    // Synthesise a WalletAccount
-    const account: WalletAccount = {
-      address,
-      publicKey: new Uint8Array(32), // placeholder; address is the useful field
-      chains: ['solana:devnet', 'solana:mainnet'],
-      features: ['solana:signAndSendTransaction', 'solana:signTransaction'],
-    }
-    // Inject into wallet.accounts so the rest of the code can read it
-    ;(wallet.accounts as WalletAccount[]).splice(0, wallet.accounts.length, account)
-    setSelectedWallet(wallet)
-    setConnectedAccount(account)
-    // Listen for external disconnects
-    const onDisconnect = () => {
-      setSelectedWallet(null)
-      setConnectedAccount(null)
-    }
-    provider.on('disconnect', onDisconnect)
-    changeUnsubRef.current = () => provider.removeListener('disconnect', onDisconnect)
-    console.log('[Wallet] Connected (legacy):', wallet.name, address)
-  }, [])
-
-  const disconnectLegacy = useCallback((wallet: LegacyWallet) => {
-    wallet.provider.disconnect().catch(console.error)
-  }, [])
-
   useEffect(() => {
-    // --- Wallet Standard (primary) ---
-    const api = getWallets()
+    if (typeof window === 'undefined') return
 
-    const dedup = (prev: readonly Wallet[], next: Wallet[]) => {
-      const existing = new Set(prev.map((w) => w.name))
-      return [...prev, ...next.filter((w) => !existing.has(w.name))]
+    const seen = new Set<string>()
+    const out: WalletEntry[] = []
+
+    const addInjected = (name: string, icon: string, provider: InjectedProvider) => {
+      if (!seen.has(name)) {
+        seen.add(name)
+        out.push({ name, icon, kind: 'injected', provider })
+      }
     }
 
-    const unsubRegister = api.on('register', (...newWallets) => {
-      setWallets((prev) => dedup(prev, newWallets.filter(isSolanaWallet)))
-    })
-    const unsubUnregister = api.on('unregister', (...removed) => {
-      const names = new Set(removed.map((w) => w.name))
-      setWallets((prev) => prev.filter((w) => !names.has(w.name)))
-    })
+    // 1. Phantom — always prefer injected provider
+    const phantom =
+      window.phantom?.solana ??
+      (window.solana?.isPhantom ? window.solana : null)
+    if (phantom) {
+      addInjected('Phantom', 'https://www.phantom.app/img/phantom-logo.png', phantom)
+    }
 
-    const wsWallets = api.get().filter(isSolanaWallet)
+    // 2. Solflare injected
+    if (window.solflare) {
+      addInjected('Solflare', 'https://solflare.com/assets/logo.svg', window.solflare)
+    }
 
-    // --- Legacy fallback (window.phantom / window.solana) ---
-    const legacyWallets = buildLegacyWallets(connectLegacy, disconnectLegacy)
-
-    // Merge: prefer Wallet Standard entries; only add legacy if no WS entry with same name
-    const wsNames = new Set(wsWallets.map((w) => w.name))
-    const merged = [
-      ...wsWallets,
-      ...legacyWallets.filter((w) => !wsNames.has(w.name)),
-    ]
-    setWallets(merged)
-
-    // Retry once after 800 ms — catches wallets that register slightly after hydration
-    const retryTimer = setTimeout(() => {
-      setWallets((prev) => {
-        const late = api.get().filter(isSolanaWallet)
-        const legacy = buildLegacyWallets(connectLegacy, disconnectLegacy)
-        const prevNames = new Set(prev.map((w) => w.name))
-        const additions = [
-          ...late.filter((w) => !prevNames.has(w.name)),
-          ...legacy.filter((w) => !prevNames.has(w.name)),
-        ]
-        return additions.length ? [...prev, ...additions] : prev
+    // 3. Other Wallet Standard wallets (Backpack, etc.) — skip Phantom / Solflare (already added)
+    const api = getWallets()
+    const wsAll = api.get().filter(
+      (w) =>
+        !seen.has(w.name) &&
+        ('standard:connect' in w.features ||
+          'solana:signTransaction' in w.features ||
+          'solana:signAndSendTransaction' in w.features),
+    )
+    for (const w of wsAll) {
+      seen.add(w.name)
+      out.push({
+        name: w.name,
+        icon: typeof w.icon === 'string' ? w.icon : '',
+        kind: 'standard',
+        wsWallet: w,
       })
-    }, 800)
+    }
+
+    setWallets(out)
+
+    // Listen for newly-registered WS wallets (e.g. user installs extension mid-session)
+    const unsubReg = api.on('register', (...newWallets) => {
+      setWallets((prev) => {
+        const existing = new Set(prev.map((w) => w.name))
+        const toAdd = newWallets
+          .filter(
+            (w) =>
+              !existing.has(w.name) &&
+              ('standard:connect' in w.features ||
+                'solana:signTransaction' in w.features ||
+                'solana:signAndSendTransaction' in w.features),
+          )
+          .map((w): WalletEntry => ({
+            name: w.name,
+            icon: typeof w.icon === 'string' ? w.icon : '',
+            kind: 'standard',
+            wsWallet: w,
+          }))
+        return toAdd.length ? [...prev, ...toAdd] : prev
+      })
+    })
+
+    // Retry once at 600 ms — catches injected wallets that load slightly after hydration
+    const retryId = setTimeout(() => {
+      setWallets((prev) => {
+        const prevNames = new Set(prev.map((w) => w.name))
+        const toAdd: WalletEntry[] = []
+        const phantom2 =
+          window.phantom?.solana ??
+          (window.solana?.isPhantom ? window.solana : null)
+        if (phantom2 && !prevNames.has('Phantom')) {
+          toAdd.push({
+            name: 'Phantom',
+            icon: 'https://www.phantom.app/img/phantom-logo.png',
+            kind: 'injected',
+            provider: phantom2,
+          })
+        }
+        if (window.solflare && !prevNames.has('Solflare')) {
+          toAdd.push({
+            name: 'Solflare',
+            icon: 'https://solflare.com/assets/logo.svg',
+            kind: 'injected',
+            provider: window.solflare,
+          })
+        }
+        return toAdd.length ? [...prev, ...toAdd] : prev
+      })
+    }, 600)
 
     return () => {
-      unsubRegister()
-      unsubUnregister()
-      clearTimeout(retryTimer)
-    }
-  }, [buildLegacyWallets, connectLegacy, disconnectLegacy])
-
-  // ── Wallet Standard event subscription ───────────────────────────
-  const subscribeToWalletEvents = useCallback((wallet: Wallet) => {
-    if (changeUnsubRef.current) {
-      changeUnsubRef.current()
-      changeUnsubRef.current = null
-    }
-    const eventsFeature = wallet.features['standard:events'] as
-      | { on: (event: string, cb: () => void) => () => void }
-      | undefined
-    if (eventsFeature?.on) {
-      changeUnsubRef.current = eventsFeature.on('change', () => {
-        if (wallet.accounts.length > 0) {
-          setConnectedAccount(wallet.accounts[0])
-        } else {
-          setSelectedWallet(null)
-          setConnectedAccount(null)
-        }
-      })
+      unsubReg()
+      clearTimeout(retryId)
     }
   }, [])
 
   // ── connect ───────────────────────────────────────────────────────
-  const connect = useCallback(async (wallet: Wallet) => {
+  const connect = useCallback(async (wallet: WalletEntry) => {
     setIsConnecting(true)
     connectingRef.current = true
     setError(null)
+
+    // Clean up previous wallet listeners
+    if (unsubRef.current) {
+      unsubRef.current()
+      unsubRef.current = null
+    }
+
     try {
-      // Legacy wallet (window.phantom / window.solana)?
-      if (wallet instanceof LegacyWallet) {
-        await connectLegacy(wallet)
+      if (wallet.kind === 'injected' && wallet.provider) {
+        // ── Injected: window.phantom.solana.connect() ──────────────
+        const provider = wallet.provider
+        const result = await Promise.race([
+          provider.connect(),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('Wallet popup timed out — try again')),
+              30_000,
+            ),
+          ),
+        ])
         if (!connectingRef.current) return
-        return
-      }
 
-      // Wallet Standard wallet
-      const feature = wallet.features['standard:connect'] as
-        | { connect: (input?: { silent?: boolean }) => Promise<{ accounts: readonly WalletAccount[] }> }
-        | undefined
-
-      if (!feature?.connect) {
-        throw new Error(`Wallet "${wallet.name}" does not support standard:connect`)
-      }
-
-      const result = await Promise.race([
-        feature.connect(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Connection timed out — check your wallet popup')), 30_000),
-        ),
-      ])
-
-      if (!connectingRef.current) return
-
-      const accounts = result?.accounts?.length ? result.accounts : wallet.accounts
-      if (accounts.length > 0) {
+        const address = result.publicKey.toString()
+        setConnectedAddress(address)
         setSelectedWallet(wallet)
-        setConnectedAccount(accounts[0])
-        subscribeToWalletEvents(wallet)
-        console.log('[Wallet] Connected (WS):', wallet.name, accounts[0].address)
+
+        // Handle external disconnects & account switches
+        const onDisconnect = () => {
+          setSelectedWallet(null)
+          setConnectedAddress(null)
+        }
+        const onAccountChange = (...args: unknown[]) => {
+          const pk = args[0] as { toString(): string } | null
+          if (pk) setConnectedAddress(pk.toString())
+          else onDisconnect()
+        }
+        provider.on('disconnect', onDisconnect)
+        provider.on('accountChanged', onAccountChange)
+        unsubRef.current = () => {
+          provider.removeListener('disconnect', onDisconnect)
+          provider.removeListener('accountChanged', onAccountChange)
+        }
+        console.log('[Wallet] Connected (injected):', wallet.name, address)
+
+      } else if (wallet.kind === 'standard' && wallet.wsWallet) {
+        // ── Wallet Standard ────────────────────────────────────────
+        const wsWallet = wallet.wsWallet
+        const feature = wsWallet.features['standard:connect'] as
+          | { connect(input?: { silent?: boolean }): Promise<{ accounts: readonly WalletAccount[] }> }
+          | undefined
+
+        if (!feature?.connect) {
+          throw new Error(`"${wallet.name}" does not support standard:connect`)
+        }
+
+        const result = await Promise.race([
+          feature.connect(),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('Wallet popup timed out — try again')),
+              30_000,
+            ),
+          ),
+        ])
+        if (!connectingRef.current) return
+
+        const accounts = result?.accounts?.length ? result.accounts : wsWallet.accounts
+        if (!accounts.length) {
+          throw new Error('No accounts returned — approval may have been rejected')
+        }
+
+        const address = accounts[0].address
+        setConnectedAddress(address)
+        setSelectedWallet(wallet)
+
+        // Subscribe to account changes
+        const eventsFeature = wsWallet.features['standard:events'] as
+          | { on(event: string, cb: () => void): () => void }
+          | undefined
+        if (eventsFeature?.on) {
+          unsubRef.current = eventsFeature.on('change', () => {
+            if (wsWallet.accounts.length > 0) {
+              setConnectedAddress(wsWallet.accounts[0].address)
+            } else {
+              setSelectedWallet(null)
+              setConnectedAddress(null)
+            }
+          })
+        }
+        console.log('[Wallet] Connected (WS):', wallet.name, address)
+
       } else {
-        throw new Error('No accounts returned — connection may have been rejected')
+        throw new Error('Unsupported wallet type')
       }
     } catch (err) {
-      if (!connectingRef.current) return
+      if (!connectingRef.current) return // user cancelled
       const message = err instanceof Error ? err.message : 'Connection failed'
-      console.error('[Wallet] Connection failed:', message)
+      console.error('[Wallet] Connect error:', message)
       setError(message)
       setSelectedWallet(null)
-      setConnectedAccount(null)
+      setConnectedAddress(null)
+      throw new Error(message) // re-throw so callers can keep UI open on failure
     } finally {
       connectingRef.current = false
       setIsConnecting(false)
     }
-  }, [connectLegacy, subscribeToWalletEvents])
+  }, [])
 
   const cancelConnect = useCallback(() => {
     connectingRef.current = false
@@ -312,58 +305,47 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const disconnect = useCallback(() => {
-    if (selectedWallet) {
-      if (selectedWallet instanceof LegacyWallet) {
-        disconnectLegacy(selectedWallet)
-      } else {
-        const feature = selectedWallet.features['standard:disconnect'] as
-          | { disconnect: () => Promise<void> }
-          | undefined
-        if (feature?.disconnect) feature.disconnect().catch(console.error)
-      }
+    if (unsubRef.current) {
+      unsubRef.current()
+      unsubRef.current = null
     }
-    if (changeUnsubRef.current) {
-      changeUnsubRef.current()
-      changeUnsubRef.current = null
+    if (selectedWallet?.kind === 'injected' && selectedWallet.provider) {
+      selectedWallet.provider.disconnect().catch(console.error)
+    } else if (selectedWallet?.kind === 'standard' && selectedWallet.wsWallet) {
+      const feature = selectedWallet.wsWallet.features['standard:disconnect'] as
+        | { disconnect(): Promise<void> }
+        | undefined
+      if (feature?.disconnect) feature.disconnect().catch(console.error)
     }
     setSelectedWallet(null)
-    setConnectedAccount(null)
+    setConnectedAddress(null)
     setError(null)
-  }, [selectedWallet, disconnectLegacy])
+    console.log('[Wallet] Disconnected')
+  }, [selectedWallet])
 
-  useEffect(() => {
-    return () => {
-      if (changeUnsubRef.current) changeUnsubRef.current()
-    }
-  }, [])
+  // Clean up on unmount
+  useEffect(() => () => { if (unsubRef.current) unsubRef.current() }, [])
 
-  const connectedAddress = useMemo<Address | null>(() => {
-    if (!connectedAccount) return null
-    return connectedAccount.address as Address
-  }, [connectedAccount])
-
-  const value: WalletContextValue = useMemo(
+  const value = useMemo<WalletContextValue>(
     () => ({
       wallets,
       selectedWallet,
-      connectedAccount,
       connectedAddress,
-      isConnected: connectedAccount !== null,
+      isConnected: connectedAddress !== null,
       isConnecting,
       error,
       connect,
       cancelConnect,
       disconnect,
     }),
-    [wallets, selectedWallet, connectedAccount, connectedAddress, isConnecting, error, connect, cancelConnect, disconnect],
+    [wallets, selectedWallet, connectedAddress, isConnecting, error, connect, cancelConnect, disconnect],
   )
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────
-
-export function useWallet(): WalletContextValue {
+export function useWallet() {
   const ctx = useContext(WalletContext)
   if (!ctx) throw new Error('useWallet must be used inside <WalletStandardProvider>')
   return ctx

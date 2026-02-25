@@ -1,5 +1,6 @@
 """Integration test for all new features"""
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -12,6 +13,9 @@ from agents.enhanced_learning_agent import EnhancedLearningAgent
 from governance.coalition import GovernanceCoalition, VotingMethod
 from sdk.python.agent_swarm_sdk import AgentSwarm, AgentType
 
+# Use env var with devnet fallback
+_RPC_URL = os.getenv("RPC_URL", "https://api.devnet.solana.com")
+
 
 async def test_jupiter_integration():
     """Test Jupiter DEX integration"""
@@ -22,22 +26,24 @@ async def test_jupiter_integration():
     from integrations.jupiter_client import TOKENS
     
     wallet = Keypair()
-    rpc_client = AsyncClient("https://api.devnet.solana.com")
+    rpc_client = AsyncClient(_RPC_URL, timeout=30)
     
-    client = JupiterClient(rpc_client, wallet)
+    async with JupiterClient(rpc_client, wallet) as client:
     
     # Test quote
-    quote = await client.get_quote(
-        input_mint=TOKENS["SOL"],
-        output_mint=TOKENS["USDC"],
-        amount=1_000_000_000  # 1 SOL
-    )
+        quote = await client.get_quote(
+            input_mint=TOKENS["SOL"],
+            output_mint=TOKENS["USDC"],
+            amount=1_000_000_000  # 1 SOL
+        )
+        
+        if quote:
+            print(f"[OK] Quote successful: 1 SOL = {quote['outAmount']} USDC")
+            print(f"   Price impact: {quote.get('priceImpactPct', 'N/A')}%")
+        else:
+            print("[FAIL] Quote failed")
     
-    if quote:
-        print(f"[OK] Quote successful: 1 SOL = {quote['outAmount']} USDC")
-        print(f"   Price impact: {quote.get('priceImpactPct', 'N/A')}%")
-    else:
-        print("[FAIL] Quote failed")
+    await rpc_client.close()
 
 
 async def test_portfolio_manager():
@@ -67,7 +73,7 @@ def test_learning_agent():
     from solana.rpc.async_api import AsyncClient
     
     wallet = Keypair()
-    rpc_client = AsyncClient("https://api.devnet.solana.com")
+    rpc_client = AsyncClient(_RPC_URL, timeout=30)
     
     agent = EnhancedLearningAgent(wallet, rpc_client)
     
@@ -147,19 +153,21 @@ async def test_sdk():
     
     swarm = AgentSwarm(
         program_id="56Vy8e8V4E6UZnsa6uDRg8HFiPwroz6nRKh7rm9xAfeK",
-        rpc_url="https://api.devnet.solana.com"
+        rpc_url=_RPC_URL
     )
     
-    # Get state
-    state = await swarm.get_swarm_state()
-    print(f"[OK] Swarm state retrieved")
-    
-    if isinstance(state, dict):
-        print(f"   State data: {list(state.keys())}")
-    else:
-        print(f"   Agents: {state.agent_count if hasattr(state, 'agent_count') else 'N/A'}")
-        print(f"   Proposals: {state.proposal_count if hasattr(state, 'proposal_count') else 'N/A'}")
-
+    try:
+        # Get state
+        state = await swarm.get_swarm_state()
+        print(f"[OK] Swarm state retrieved")
+        
+        if isinstance(state, dict):
+            print(f"   State data: {list(state.keys())}")
+        else:
+            print(f"   Agents: {state.agent_count if hasattr(state, 'agent_count') else 'N/A'}")
+            print(f"   Proposals: {state.proposal_count if hasattr(state, 'proposal_count') else 'N/A'}")
+    finally:
+        await swarm.close()
 
 async def main():
     """Run all integration tests"""

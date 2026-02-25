@@ -35,7 +35,7 @@ async def check_agent_status():
     authority_keypair = Keypair.from_bytes(bytes(keypair_data))
     
     # Setup client and program
-    client = AsyncClient(rpc_url, commitment=Confirmed)
+    client = AsyncClient(rpc_url, commitment=Confirmed, timeout=30)
     wallet = Wallet(authority_keypair)
     
     with open(idl_path, 'r') as f:

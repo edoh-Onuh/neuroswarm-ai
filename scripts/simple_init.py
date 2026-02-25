@@ -9,6 +9,7 @@ from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 from solders.system_program import ID as SYS_PROGRAM_ID
 from solana.rpc.async_api import AsyncClient
+from solana.rpc.commitment import Confirmed
 from solders.transaction import VersionedTransaction
 from solders.instruction import Instruction, AccountMeta
 from solders.message import MessageV0
@@ -46,7 +47,7 @@ async def initialize_swarm():
     print(f"Swarm State PDA: {swarm_state_pda}")
     
     # Create client
-    client = AsyncClient(RPC_URL)
+    client = AsyncClient(RPC_URL, commitment=Confirmed, timeout=30)
     
     try:
         # Check if already initialized

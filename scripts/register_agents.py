@@ -9,6 +9,7 @@ from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 from solders.system_program import ID as SYS_PROGRAM_ID
 from solana.rpc.async_api import AsyncClient
+from solana.rpc.commitment import Confirmed
 from solders.transaction import VersionedTransaction
 from solders.instruction import Instruction, AccountMeta
 from solders.message import MessageV0
@@ -147,7 +148,7 @@ async def register_all_agents():
     swarm_state_pda, _ = Pubkey.find_program_address([b"swarm"], PROGRAM_ID)
     print(f"Swarm State: {swarm_state_pda}")
     
-    client = AsyncClient(RPC_URL)
+    client = AsyncClient(RPC_URL, commitment=Confirmed, timeout=30)
     
     try:
         # Verify swarm is initialized

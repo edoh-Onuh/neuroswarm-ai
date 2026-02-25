@@ -51,12 +51,20 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
     const checkHealth = async () => {
       try {
+        // 10-second timeout via AbortSignal
+        const timeoutId = setTimeout(() => controller.abort(), 10_000)
         const res = await fetch(rpcUrlRef.current, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getHealth' }),
           signal: controller.signal,
         })
+        clearTimeout(timeoutId)
+
+        if (!res.ok) {
+          setIsConnected(false)
+          return
+        }
         const json = await res.json()
         const wasConnected = isConnected
         const nowConnected = json.result === 'ok'
@@ -117,6 +125,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   const refreshData = useCallback(async () => {
     setIsRefreshing(true)
+    const refreshController = new AbortController()
+    const timeoutId = setTimeout(() => refreshController.abort(), 10_000)
     try {
       // Trigger real re-fetch by incrementing counter
       setRefreshCounter(prev => prev + 1)
@@ -126,7 +136,13 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getHealth' }),
+        signal: refreshController.signal,
       })
+      clearTimeout(timeoutId)
+
+      if (!res.ok) {
+        throw new Error(`RPC responded with HTTP ${res.status}`)
+      }
       const json = await res.json()
       setIsConnected(json.result === 'ok')
       setLastUpdate(Date.now())

@@ -42,7 +42,7 @@ async def initialize_swarm():
     logger.info(f"RPC: {rpc_url}")
     
     # Setup client and program
-    client = AsyncClient(rpc_url, commitment=Confirmed)
+    client = AsyncClient(rpc_url, commitment=Confirmed, timeout=30)
     wallet = Wallet(authority_keypair)
     
     with open(idl_path, 'r') as f:

@@ -33,7 +33,7 @@ class AgentSwarm:
     ):
         self.program_id = Pubkey.from_string(program_id)
         self.rpc_url = rpc_url
-        self.client = AsyncClient(rpc_url)
+        self.client = AsyncClient(rpc_url, timeout=30)
         self.authority = authority
         
         # Cached data

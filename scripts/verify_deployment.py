@@ -5,6 +5,7 @@ import os
 import asyncio
 from solders.pubkey import Pubkey
 from solana.rpc.async_api import AsyncClient
+from solana.rpc.commitment import Confirmed
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,7 +19,7 @@ async def verify_deployment():
     print("🔍 SOLANA AGENT SWARM - ON-CHAIN VERIFICATION")
     print("=" * 70)
     
-    client = AsyncClient(RPC_URL)
+    client = AsyncClient(RPC_URL, commitment=Confirmed, timeout=30)
     
     try:
         print(f"\n📍 Program ID: {PROGRAM_ID}")

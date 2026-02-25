@@ -2,22 +2,34 @@
 Analytics Agent - Analyzes on-chain data and market conditions
 
 This agent:
-- Monitors Solana DeFi protocols (Jupiter, Orca, Raydium)
+- Monitors Solana DeFi protocols via Jupiter Price API v2
 - Analyzes market trends and liquidity
 - Generates insights for portfolio management
 - Proposes rebalancing strategies based on data
 """
 
+import asyncio
 import logging
 from typing import Dict, Any, Optional, List
 import json
 import time
+
+import aiohttp
 
 from base_agent import (
     BaseAgent, AgentType, ProposalType, VoteType, ProposalData
 )
 
 logger = logging.getLogger(__name__)
+
+_HTTP_TIMEOUT = aiohttp.ClientTimeout(total=15)
+_JUPITER_PRICE = "https://api.jup.ag/price/v2"
+
+# Token mint addresses for Jupiter Price API
+_PRICE_MINTS = {
+    "SOL": "So11111111111111111111111111111111111111112",
+    "USDC": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+}
 
 
 class AnalyticsAgent(BaseAgent):
@@ -182,22 +194,55 @@ class AnalyticsAgent(BaseAgent):
     
     async def _fetch_market_data(self) -> Dict[str, Any]:
         """
-        Fetch real-time market data from Solana DeFi protocols.
-        
-        In a real implementation, would:
-        - Query Jupiter for token prices
-        - Check Orca pools for liquidity
-        - Monitor Raydium volumes
-        - Track on-chain metrics
+        Fetch real-time market data from Jupiter Price API v2.
+
+        Returns live SOL/USDC price and basic market signals.
+        Falls back to cached data on API failure.
         """
-        # Simulated market data for demonstration
+        try:
+            async with aiohttp.ClientSession(timeout=_HTTP_TIMEOUT) as session:
+                # Fetch SOL and USDC prices in a single request
+                mint_ids = ",".join(_PRICE_MINTS.values())
+                async with session.get(_JUPITER_PRICE, params={"ids": mint_ids}) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        prices = data.get("data", {})
+
+                        sol_mint = _PRICE_MINTS["SOL"]
+                        sol_data = prices.get(sol_mint, {})
+                        sol_price = float(sol_data.get("price", 0)) if sol_data else 0.0
+
+                        result = {
+                            "SOL_price": sol_price,
+                            "liquidity_depth": 0,  # not available from price API
+                            "24h_volume": 0,
+                            "volatility": 0.15,  # placeholder — real vol requires historical data
+                            "trend": "stable",
+                            "timestamp": int(time.time()),
+                        }
+
+                        # Cache successful result
+                        self.market_data_cache = result
+                        return result
+
+                    logger.warning("Jupiter Price API returned %d", resp.status)
+
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            logger.warning("Failed to fetch market data from Jupiter: %s", e)
+
+        # Fallback to cached data if available
+        if self.market_data_cache:
+            logger.info("Using cached market data")
+            return self.market_data_cache
+
+        # Last resort: return safe defaults
         return {
-            "SOL_price": 100.0,  # USD
-            "liquidity_depth": 1000000,  # USD
-            "24h_volume": 5000000,  # USD
-            "volatility": 0.15,  # 15%
-            "trend": "stable",
-            "timestamp": int(time.time())
+            "SOL_price": 0.0,
+            "liquidity_depth": 0,
+            "24h_volume": 0,
+            "volatility": 0.15,
+            "trend": "unknown",
+            "timestamp": int(time.time()),
         }
     
     async def _analyze_portfolio(

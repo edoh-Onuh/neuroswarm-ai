@@ -1,9 +1,13 @@
 """
 Jupiter DEX Integration for Agent Swarm
 Enables agents to execute real trades on Solana's largest aggregator
+
+Uses Jupiter Swap API v1 (https://docs.jup.ag/docs/apis/swap-api)
+and Jupiter Price API v2 (https://docs.jup.ag/docs/apis/price-api-v2)
 """
 import os
 import asyncio
+import logging
 import aiohttp
 from typing import Dict, List, Optional
 from solders.keypair import Keypair
@@ -13,200 +17,260 @@ from solders.transaction import VersionedTransaction
 from solders.message import MessageV0
 import base64
 
+logger = logging.getLogger(__name__)
+
+# Default timeout for all HTTP requests (seconds)
+_DEFAULT_TIMEOUT = aiohttp.ClientTimeout(total=30)
+
+# Max retries for transient failures
+_MAX_RETRIES = 3
+_RETRY_BACKOFF = 1.0  # seconds, doubled each retry
+
 
 class JupiterClient:
-    """Client for interacting with Jupiter API for token swaps"""
-    
+    """Client for interacting with Jupiter API for token swaps.
+
+    Uses a shared ``aiohttp.ClientSession`` for connection reuse.
+    Call ``close()`` (or use as async context manager) when done.
+    """
+
+    # Current Jupiter API endpoints (v1 swap, v2 price)
+    QUOTE_URL = "https://api.jup.ag/swap/v1/quote"
+    SWAP_URL = "https://api.jup.ag/swap/v1/swap"
+    PRICE_URL = "https://api.jup.ag/price/v2"
+
     def __init__(self, rpc_client: AsyncClient, wallet: Keypair):
         self.rpc_client = rpc_client
         self.wallet = wallet
-        self.base_url = "https://quote-api.jup.ag/v6"
-        
+        self._session: Optional[aiohttp.ClientSession] = None
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Return (and lazily create) a reusable HTTP session."""
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession(timeout=_DEFAULT_TIMEOUT)
+        return self._session
+
+    async def close(self) -> None:
+        """Close the underlying HTTP session."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        await self.close()
+
+    # ── internal retry helper ────────────────────────────────────
+
+    async def _request_with_retry(
+        self,
+        method: str,
+        url: str,
+        *,
+        params: Optional[Dict] = None,
+        json_payload: Optional[Dict] = None,
+    ) -> Optional[Dict]:
+        """Execute an HTTP request with retries and proper error handling."""
+        session = await self._get_session()
+        last_error: Optional[Exception] = None
+        backoff = _RETRY_BACKOFF
+
+        for attempt in range(1, _MAX_RETRIES + 1):
+            try:
+                if method == "GET":
+                    resp = await session.get(url, params=params)
+                else:
+                    resp = await session.post(url, json=json_payload)
+
+                if resp.status == 200:
+                    return await resp.json()
+
+                # Rate limited — wait and retry
+                if resp.status == 429:
+                    retry_after = float(resp.headers.get("Retry-After", backoff))
+                    logger.warning(
+                        "Jupiter rate limited (429), retrying in %.1fs (attempt %d/%d)",
+                        retry_after, attempt, _MAX_RETRIES,
+                    )
+                    await asyncio.sleep(retry_after)
+                    backoff *= 2
+                    continue
+
+                # Non-retryable HTTP error
+                error_text = await resp.text()
+                logger.error("Jupiter %s %s returned %d: %s", method, url, resp.status, error_text)
+                return None
+
+            except asyncio.TimeoutError:
+                last_error = asyncio.TimeoutError(f"Timeout on {url}")
+                logger.warning("Jupiter request timed out (attempt %d/%d)", attempt, _MAX_RETRIES)
+            except aiohttp.ClientError as exc:
+                last_error = exc
+                logger.warning("Jupiter connection error (attempt %d/%d): %s", attempt, _MAX_RETRIES, exc)
+
+            await asyncio.sleep(backoff)
+            backoff *= 2
+
+        logger.error("Jupiter request failed after %d attempts: %s", _MAX_RETRIES, last_error)
+        return None
+
+    # ── public methods ───────────────────────────────────────────
+
     async def get_quote(
         self,
         input_mint: str,
         output_mint: str,
         amount: int,
-        slippage_bps: int = 50  # 0.5% default slippage
+        slippage_bps: int = 50,  # 0.5% default slippage
     ) -> Optional[Dict]:
         """
-        Get swap quote from Jupiter
-        
+        Get swap quote from Jupiter Swap API v1.
+
         Args:
             input_mint: Input token mint address
             output_mint: Output token mint address
             amount: Amount in smallest units (lamports for SOL)
             slippage_bps: Slippage tolerance in basis points
-            
+
         Returns:
             Quote data or None if failed
         """
-        try:
-            params = {
-                "inputMint": input_mint,
-                "outputMint": output_mint,
-                "amount": str(amount),
-                "slippageBps": str(slippage_bps),
-            }
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.get(f"{self.base_url}/quote", params=params) as resp:
-                    if resp.status == 200:
-                        quote = await resp.json()
-                        return quote
-                    else:
-                        print(f"Jupiter quote error: {resp.status}")
-                        return None
-                        
-        except Exception as e:
-            print(f"Error getting Jupiter quote: {e}")
-            return None
-    
+        params = {
+            "inputMint": input_mint,
+            "outputMint": output_mint,
+            "amount": str(amount),
+            "slippageBps": str(slippage_bps),
+        }
+        return await self._request_with_retry("GET", self.QUOTE_URL, params=params)
+
     async def get_swap_transaction(
         self,
         quote: Dict,
         user_public_key: str,
         wrap_unwrap_sol: bool = True,
-        compute_unit_price_micro_lamports: Optional[int] = None
+        compute_unit_price_micro_lamports: Optional[int] = None,
     ) -> Optional[Dict]:
         """
-        Get swap transaction from Jupiter
-        
+        Get swap transaction from Jupiter Swap API v1.
+
         Args:
             quote: Quote data from get_quote()
             user_public_key: User's public key as string
             wrap_unwrap_sol: Whether to wrap/unwrap SOL
             compute_unit_price_micro_lamports: Priority fee
-            
+
         Returns:
             Transaction data or None if failed
         """
-        try:
-            payload = {
-                "quoteResponse": quote,
-                "userPublicKey": user_public_key,
-                "wrapAndUnwrapSol": wrap_unwrap_sol,
-            }
-            
-            if compute_unit_price_micro_lamports:
-                payload["computeUnitPriceMicroLamports"] = compute_unit_price_micro_lamports
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{self.base_url}/swap",
-                    json=payload
-                ) as resp:
-                    if resp.status == 200:
-                        swap_data = await resp.json()
-                        return swap_data
-                    else:
-                        error_text = await resp.text()
-                        print(f"Jupiter swap error: {resp.status} - {error_text}")
-                        return None
-                        
-        except Exception as e:
-            print(f"Error getting swap transaction: {e}")
-            return None
-    
+        payload: Dict = {
+            "quoteResponse": quote,
+            "userPublicKey": user_public_key,
+            "wrapAndUnwrapSol": wrap_unwrap_sol,
+        }
+        if compute_unit_price_micro_lamports:
+            payload["computeUnitPriceMicroLamports"] = compute_unit_price_micro_lamports
+
+        return await self._request_with_retry("POST", self.SWAP_URL, json_payload=payload)
+
     async def execute_swap(
         self,
         input_mint: str,
         output_mint: str,
         amount: int,
         slippage_bps: int = 50,
-        priority_fee: Optional[int] = None
+        priority_fee: Optional[int] = None,
     ) -> Optional[str]:
         """
-        Execute a token swap via Jupiter
-        
+        Execute a token swap via Jupiter.
+
         Args:
             input_mint: Input token mint address
-            output_mint: Output token mint address  
+            output_mint: Output token mint address
             amount: Amount in smallest units
             slippage_bps: Slippage tolerance in basis points
             priority_fee: Priority fee in micro-lamports
-            
+
         Returns:
             Transaction signature or None if failed
         """
         try:
-            # Get quote
-            print(f"🔍 Getting quote: {amount} {input_mint[:8]}... -> {output_mint[:8]}...")
+            logger.info("Getting quote: %d %s... -> %s...", amount, input_mint[:8], output_mint[:8])
             quote = await self.get_quote(input_mint, output_mint, amount, slippage_bps)
-            
+
             if not quote:
-                print("❌ Failed to get quote")
+                logger.error("Failed to get quote")
                 return None
-            
+
             in_amount = int(quote.get("inAmount", 0))
             out_amount = int(quote.get("outAmount", 0))
             price_impact = float(quote.get("priceImpactPct", 0))
-            
-            print(f"📊 Quote: {in_amount} -> {out_amount} (impact: {price_impact:.4f}%)")
-            
-            # Get swap transaction
-            print(f"📝 Building swap transaction...")
+
+            logger.info("Quote: %d -> %d (impact: %.4f%%)", in_amount, out_amount, price_impact)
+
+            logger.info("Building swap transaction...")
             swap_data = await self.get_swap_transaction(
                 quote,
                 str(self.wallet.pubkey()),
                 wrap_unwrap_sol=True,
-                compute_unit_price_micro_lamports=priority_fee
+                compute_unit_price_micro_lamports=priority_fee,
             )
-            
+
             if not swap_data:
-                print("❌ Failed to get swap transaction")
+                logger.error("Failed to get swap transaction")
                 return None
-            
+
             # Deserialize and sign transaction
             swap_tx_b64 = swap_data.get("swapTransaction")
             if not swap_tx_b64:
-                print("❌ No swap transaction in response")
+                logger.error("No swapTransaction in response")
                 return None
-            
+
             swap_tx_bytes = base64.b64decode(swap_tx_b64)
             transaction = VersionedTransaction.from_bytes(swap_tx_bytes)
-            
+
             # Sign transaction
             transaction.sign([self.wallet])
-            
+
             # Send transaction
-            print(f"📤 Sending swap transaction...")
+            logger.info("Sending swap transaction...")
             result = await self.rpc_client.send_transaction(transaction)
             signature = str(result.value)
-            
-            print(f"⏳ Confirming transaction: {signature}")
+
+            logger.info("Confirming transaction: %s", signature)
             await self.rpc_client.confirm_transaction(signature)
-            
-            print(f"✅ Swap successful: {signature}")
+
+            logger.info("Swap successful: %s", signature)
             return signature
-            
+
         except Exception as e:
-            print(f"❌ Error executing swap: {e}")
+            logger.error("Error executing swap: %s", e)
             return None
-    
+
     async def get_token_price(self, mint_address: str) -> Optional[float]:
         """
-        Get token price in USD
-        
+        Get token price in USD via Jupiter Price API v2.
+
         Args:
             mint_address: Token mint address
-            
+
         Returns:
             Price in USD or None
         """
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f"https://price.jup.ag/v4/price?ids={mint_address}"
-                ) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        price_data = data.get("data", {}).get(mint_address)
-                        if price_data:
-                            return float(price_data.get("price", 0))
-                    return None
-        except Exception as e:
-            print(f"Error getting token price: {e}")
+            data = await self._request_with_retry(
+                "GET", self.PRICE_URL, params={"ids": mint_address}
+            )
+            if data is None:
+                return None
+
+            token_data = data.get("data", {}).get(mint_address)
+            if token_data and token_data.get("price") is not None:
+                return float(token_data["price"])
+            return None
+        except (KeyError, ValueError, TypeError) as e:
+            logger.error("Error parsing token price: %s", e)
             return None
 
 
@@ -226,28 +290,27 @@ async def test_jupiter_swap():
     """Test Jupiter integration"""
     from dotenv import load_dotenv
     import json
-    
+
     load_dotenv()
-    
+
     # Load wallet
     wallet_path = os.getenv("CONSENSUS_AGENT_KEYPAIR", "keys/consensus-keypair.json")
     with open(wallet_path, 'r') as f:
         secret = json.load(f)
     wallet = Keypair.from_bytes(bytes(secret))
-    
+
     # Initialize client
     rpc_url = os.getenv("RPC_URL", "https://api.devnet.solana.com")
     rpc_client = AsyncClient(rpc_url)
-    
-    jupiter = JupiterClient(rpc_client, wallet)
-    
-    # Test: Get SOL price
-    print("\n" + "=" * 60)
-    print("Testing Jupiter Integration")
-    print("=" * 60)
-    
-    sol_price = await jupiter.get_token_price(TOKENS["SOL"])
-    if sol_price:
+
+    async with JupiterClient(rpc_client, wallet) as jupiter:
+        # Test: Get SOL price
+        print("\n" + "=" * 60)
+        print("Testing Jupiter Integration")
+        print("=" * 60)
+
+        sol_price = await jupiter.get_token_price(TOKENS["SOL"])
+        if sol_price:
         print(f"\n💰 SOL Price: ${sol_price:.2f}")
     
     # Test: Get quote (0.01 SOL -> USDC)
@@ -259,12 +322,13 @@ async def test_jupiter_swap():
         slippage_bps=50
     )
     
-    if quote:
-        print(f"\n📊 Quote for 0.01 SOL -> USDC:")
-        print(f"   Output: {int(quote['outAmount']) / 1_000_000:.4f} USDC")
-        print(f"   Price Impact: {float(quote['priceImpactPct']):.4f}%")
-        print(f"   Route: {len(quote['routePlan'])} hop(s)")
-    
+        if quote:
+            print(f"\nQuote for 0.01 SOL -> USDC:")
+            print(f"   Output: {int(quote['outAmount']) / 1_000_000:.4f} USDC")
+            print(f"   Price Impact: {float(quote.get('priceImpactPct', 0)):.4f}%")
+            route_plan = quote.get("routePlan", [])
+            print(f"   Route: {len(route_plan)} hop(s)")
+
     await rpc_client.close()
 
 

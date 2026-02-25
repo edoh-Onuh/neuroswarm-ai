@@ -18,9 +18,13 @@ from solders.keypair import Keypair
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
 from anchorpy import Provider, Wallet, Program, Idl
+from aiohttp import ClientTimeout
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Default HTTP timeout for Solana RPC calls (seconds)
+_RPC_TIMEOUT = ClientTimeout(total=30)
 
 
 class AgentType(Enum):
@@ -103,8 +107,8 @@ class BaseAgent(ABC):
         self.keypair = Keypair.from_bytes(bytes(keypair_data))
         self.pubkey = self.keypair.pubkey()
         
-        # Initialize Solana client
-        self.client = AsyncClient(rpc_url, commitment=Confirmed)
+        # Initialize Solana client with a 30-second timeout
+        self.client = AsyncClient(rpc_url, commitment=Confirmed, timeout=30)
         self.wallet = Wallet(self.keypair)
         
         # Program configuration
@@ -372,6 +376,14 @@ class BaseAgent(ABC):
         """
         pass
     
+    async def close(self):
+        """Close the underlying RPC client to free connections."""
+        try:
+            await self.client.close()
+            logger.info(f"Agent {self.name} RPC client closed")
+        except Exception as e:
+            logger.warning(f"Error closing RPC client for {self.name}: {e}")
+
     async def run(self):
         """
         Main agent loop - continuously monitors and makes decisions.

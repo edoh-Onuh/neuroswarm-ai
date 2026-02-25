@@ -10,13 +10,22 @@ This agent:
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 import json
 import time
+
+import aiohttp
+from aiohttp import ClientTimeout
 
 from base_agent import (
     BaseAgent, AgentType, ProposalType, VoteType, ProposalData
 )
+
+_HTTP_TIMEOUT = ClientTimeout(total=15)
+_JUPITER_PRICE = "https://api.jup.ag/price/v2"
+_SOL_MINT = "So11111111111111111111111111111111111111112"
+_USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+_LAMPORTS_PER_SOL = 1_000_000_000
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +61,11 @@ class RiskManagementAgent(BaseAgent):
         self.risk_check_interval = 60  # Check every minute
         self.last_risk_check = 0
         self.emergency_stop_triggered = False
+
+        # Tracking for drawdown calculation
+        self._peak_portfolio_value: float = 0.0
+        self._portfolio_history: List[float] = []
+        self._session: Optional[aiohttp.ClientSession] = None
         
     async def analyze_and_decide(self) -> Optional[Dict[str, Any]]:
         """
@@ -241,26 +255,106 @@ class RiskManagementAgent(BaseAgent):
         else:
             return "Insufficient information to assess risk impact"
     
+    # ------------------------------------------------------------------
+    # Real data helpers
+    # ------------------------------------------------------------------
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Lazy-init a shared HTTP session."""
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession(timeout=_HTTP_TIMEOUT)
+        return self._session
+
+    async def _get_sol_price(self) -> float:
+        """Fetch live SOL/USD price from Jupiter Price API v2."""
+        try:
+            session = await self._get_session()
+            async with session.get(
+                _JUPITER_PRICE, params={"ids": _SOL_MINT}
+            ) as resp:
+                if resp.status != 200:
+                    logger.warning("Jupiter price API returned %s", resp.status)
+                    return 0.0
+                body = await resp.json()
+                entry = body.get("data", {}).get(_SOL_MINT)
+                if entry and entry.get("price"):
+                    return float(entry["price"])
+        except Exception as exc:
+            logger.warning("Failed to fetch SOL price: %s", exc)
+        return 0.0
+
+    async def _get_sol_balance(self) -> float:
+        """Query the agent's SOL balance via Solana RPC."""
+        try:
+            resp = await self.client.get_balance(self.keypair.pubkey())
+            lamports = resp.value
+            return lamports / _LAMPORTS_PER_SOL
+        except Exception as exc:
+            logger.warning("Failed to fetch SOL balance: %s", exc)
+            return 0.0
+
     async def _calculate_risk_metrics(self) -> Dict[str, Any]:
         """
-        Calculate current portfolio risk metrics.
-        
-        In a real implementation, would:
-        - Query actual portfolio balances
-        - Calculate VaR (Value at Risk)
-        - Compute Sharpe ratio
-        - Track historical drawdowns
+        Calculate portfolio risk metrics using real on-chain data.
+
+        Queries:
+        - SOL balance from Solana RPC
+        - SOL/USD price from Jupiter Price API v2
+        Computes:
+        - Portfolio value in USD
+        - Current drawdown from peak
+        - Position concentration (SOL vs stablecoins)
+        - Simple historical volatility
         """
-        # Simulated risk metrics for demonstration
+        sol_balance = await self._get_sol_balance()
+        sol_price = await self._get_sol_price()
+
+        # Portfolio valuation
+        sol_value_usd = sol_balance * sol_price if sol_price else 0.0
+        # Assume remaining value is in stablecoins (no SPL token query yet)
+        total_value = sol_value_usd  # extend when SPL token balances added
+
+        # Track peak for drawdown
+        if total_value > self._peak_portfolio_value:
+            self._peak_portfolio_value = total_value
+
+        current_drawdown = 0.0
+        if self._peak_portfolio_value > 0:
+            current_drawdown = (
+                1.0 - total_value / self._peak_portfolio_value
+            )
+
+        # Position concentration (SOL fraction of portfolio)
+        sol_pct = 1.0 if total_value > 0 else 0.0  # all SOL for now
+
+        # Historical volatility from recent snapshots
+        self._portfolio_history.append(total_value)
+        if len(self._portfolio_history) > 100:
+            self._portfolio_history = self._portfolio_history[-100:]
+
+        volatility = 0.0
+        if len(self._portfolio_history) >= 2:
+            returns = []
+            for i in range(1, len(self._portfolio_history)):
+                prev = self._portfolio_history[i - 1]
+                curr = self._portfolio_history[i]
+                if prev > 0:
+                    returns.append((curr - prev) / prev)
+            if returns:
+                mean_r = sum(returns) / len(returns)
+                variance = sum((r - mean_r) ** 2 for r in returns) / len(returns)
+                volatility = variance ** 0.5
+
         return {
-            "current_drawdown": 0.08,  # 8% drawdown
-            "max_position_pct": 0.65,  # 65% in largest position
+            "current_drawdown": max(current_drawdown, 0.0),
+            "max_position_pct": sol_pct,
             "largest_position": "SOL",
-            "volatility": 0.15,  # 15% volatility
-            "sharpe_ratio": 1.2,
-            "liquidity_ratio": 0.35,  # 35% in stablecoins
-            "var_95": 0.12,  # 95% VaR: 12%
-            "timestamp": int(time.time())
+            "sol_balance": sol_balance,
+            "sol_price_usd": sol_price,
+            "portfolio_value_usd": total_value,
+            "volatility": volatility,
+            "liquidity_ratio": 1.0 - sol_pct,  # non-SOL fraction
+            "timestamp": int(time.time()),
         }
     
     async def generate_risk_report(self) -> Dict[str, Any]:
@@ -278,6 +372,12 @@ class RiskManagementAgent(BaseAgent):
             "status": "healthy" if metrics["current_drawdown"] < self.max_drawdown else "critical",
             "alerts": []
         }
+
+    async def close(self) -> None:
+        """Release HTTP session and RPC client."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+        await super().close()
 
 
 async def main():

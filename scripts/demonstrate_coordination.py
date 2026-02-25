@@ -15,6 +15,7 @@ from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 from solders.system_program import ID as SYS_PROGRAM_ID
 from solana.rpc.async_api import AsyncClient
+from solana.rpc.commitment import Confirmed
 from solders.transaction import VersionedTransaction
 from solders.instruction import Instruction, AccountMeta
 from solders.message import MessageV0
@@ -204,7 +205,7 @@ async def demonstrate_coordination():
     print(f"\nProgram ID: {PROGRAM_ID}")
     print(f"RPC URL: {RPC_URL}")
     
-    client = AsyncClient(RPC_URL)
+    client = AsyncClient(RPC_URL, commitment=Confirmed, timeout=30)
     
     try:
         # Load all agent keypairs

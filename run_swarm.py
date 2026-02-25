@@ -82,9 +82,14 @@ class AgentSwarm:
         await asyncio.gather(*tasks)
     
     async def shutdown(self):
-        """Gracefully shutdown the swarm"""
+        """Gracefully shutdown the swarm — close all agent RPC clients."""
         logger.info("Shutting down agent swarm...")
-        # Could add cleanup logic here
+        for agent in self.agents:
+            try:
+                await agent.close()
+            except Exception as e:
+                logger.warning(f"Error closing agent {agent.name}: {e}")
+        logger.info("All agent connections closed.")
 
 
 async def main():

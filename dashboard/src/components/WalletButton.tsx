@@ -18,6 +18,7 @@ export default function WalletButton() {
     isConnecting,
     connectedAddress,
     selectedWallet,
+    error,
     connect,
     disconnect,
   } = useWallet()
@@ -97,17 +98,36 @@ export default function WalletButton() {
           <div className="p-3 border-b border-white/10">
             <p className="text-sm text-gray-400">Select a wallet</p>
           </div>
+
+          {/* Connection error banner */}
+          {error && (
+            <div className="px-3 py-2 bg-red-500/10 border-b border-red-500/20">
+              <p className="text-xs text-red-400">{error}</p>
+            </div>
+          )}
+
           {wallets.length === 0 ? (
             <div className="p-4 text-center">
               <p className="text-sm text-gray-400">No Solana wallets found</p>
-              <a
-                href="https://phantom.app"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-solana-purple hover:underline mt-1 block"
-              >
-                Install Phantom
-              </a>
+              <p className="text-xs text-gray-500 mt-1">Install a browser wallet extension</p>
+              <div className="flex flex-col gap-1 mt-2">
+                <a
+                  href="https://phantom.app"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-solana-purple hover:underline"
+                >
+                  Get Phantom
+                </a>
+                <a
+                  href="https://solflare.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-solana-purple hover:underline"
+                >
+                  Get Solflare
+                </a>
+              </div>
             </div>
           ) : (
             <div className="py-1">
@@ -116,7 +136,8 @@ export default function WalletButton() {
                   key={wallet.name}
                   onClick={async () => {
                     await connect(wallet)
-                    setShowDropdown(false)
+                    // Only close if connection succeeded (error state handles failure)
+                    if (!error) setShowDropdown(false)
                   }}
                   className="w-full flex items-center space-x-3 px-3 py-2 hover:bg-white/5 transition-colors"
                 >

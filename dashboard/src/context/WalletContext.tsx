@@ -17,6 +17,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -42,6 +43,8 @@ interface WalletContextValue {
   isConnected: boolean
   /** Whether we are in the process of connecting */
   isConnecting: boolean
+  /** Last connection error message (or null) */
+  error: string | null
   /** Connect to a specific wallet */
   connect: (wallet: Wallet) => Promise<void>
   /** Disconnect the current wallet */
@@ -68,27 +71,29 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
   const [selectedWallet, setSelectedWallet] = useState<Wallet | null>(null)
   const [connectedAccount, setConnectedAccount] = useState<WalletAccount | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const changeUnsubRef = useRef<(() => void) | null>(null)
 
   // Discover wallets via Wallet Standard
   useEffect(() => {
-    const { get, on } = getWallets()
+    const api = getWallets()
 
-    // Filter for Solana-compatible wallets
-    const solanaWallets = get().filter(isSolanaWallet)
-    setWallets(solanaWallets)
-
-    // Listen for new wallets being registered
-    const unsubRegister = on('register', (...newWallets) => {
+    // Set up listener FIRST to avoid missing registrations
+    const unsubRegister = api.on('register', (...newWallets) => {
       setWallets((prev) => [
         ...prev,
         ...newWallets.filter(isSolanaWallet),
       ])
     })
 
-    const unsubUnregister = on('unregister', (...removedWallets) => {
+    const unsubUnregister = api.on('unregister', (...removedWallets) => {
       const removedNames = new Set(removedWallets.map((w) => w.name))
       setWallets((prev) => prev.filter((w) => !removedNames.has(w.name)))
     })
+
+    // Then get currently registered wallets
+    const solanaWallets = api.get().filter(isSolanaWallet)
+    setWallets(solanaWallets)
 
     return () => {
       unsubRegister()
@@ -96,40 +101,96 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Subscribe to wallet account changes (e.g. user switches account in wallet)
+  const subscribeToWalletEvents = useCallback((wallet: Wallet) => {
+    // Unsubscribe from previous wallet events
+    if (changeUnsubRef.current) {
+      changeUnsubRef.current()
+      changeUnsubRef.current = null
+    }
+
+    const eventsFeature = wallet.features['standard:events'] as
+      | { on: (event: string, cb: () => void) => () => void }
+      | undefined
+
+    if (eventsFeature?.on) {
+      changeUnsubRef.current = eventsFeature.on('change', () => {
+        // Wallet may have updated its accounts
+        if (wallet.accounts.length > 0) {
+          setConnectedAccount(wallet.accounts[0])
+        } else {
+          // Wallet disconnected externally
+          setSelectedWallet(null)
+          setConnectedAccount(null)
+        }
+      })
+    }
+  }, [])
+
   const connect = useCallback(async (wallet: Wallet) => {
     setIsConnecting(true)
+    setError(null)
     try {
-      const connectFeature = wallet.features['standard:connect'] as any
-      if (!connectFeature) {
+      const feature = wallet.features['standard:connect'] as
+        | { connect: (input?: { silent?: boolean }) => Promise<{ accounts: readonly WalletAccount[] }> }
+        | undefined
+
+      if (!feature?.connect) {
         throw new Error(`Wallet "${wallet.name}" does not support standard:connect`)
       }
 
-      const result = await connectFeature.connect()
-      const accounts = result.accounts ?? wallet.accounts
+      const result = await feature.connect()
+
+      // Some wallets return accounts in result, others update wallet.accounts
+      const accounts = (result?.accounts?.length ? result.accounts : wallet.accounts)
 
       if (accounts.length > 0) {
         setSelectedWallet(wallet)
         setConnectedAccount(accounts[0])
+        subscribeToWalletEvents(wallet)
+        console.log('[Wallet] Connected:', wallet.name, accounts[0].address)
+      } else {
+        throw new Error('No accounts returned — connection may have been rejected')
       }
     } catch (err) {
-      console.error('Wallet connection failed:', err)
+      const message = err instanceof Error ? err.message : 'Connection failed'
+      console.error('[Wallet] Connection failed:', message)
+      setError(message)
       setSelectedWallet(null)
       setConnectedAccount(null)
     } finally {
       setIsConnecting(false)
     }
-  }, [])
+  }, [subscribeToWalletEvents])
 
   const disconnect = useCallback(() => {
     if (selectedWallet) {
-      const disconnectFeature = selectedWallet.features['standard:disconnect'] as any
-      if (disconnectFeature) {
-        disconnectFeature.disconnect().catch(console.error)
+      const feature = selectedWallet.features['standard:disconnect'] as
+        | { disconnect: () => Promise<void> }
+        | undefined
+      if (feature?.disconnect) {
+        feature.disconnect().catch(console.error)
       }
+    }
+    // Clean up event subscription
+    if (changeUnsubRef.current) {
+      changeUnsubRef.current()
+      changeUnsubRef.current = null
     }
     setSelectedWallet(null)
     setConnectedAccount(null)
+    setError(null)
+    console.log('[Wallet] Disconnected')
   }, [selectedWallet])
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (changeUnsubRef.current) {
+        changeUnsubRef.current()
+      }
+    }
+  }, [])
 
   const connectedAddress = useMemo<Address | null>(() => {
     if (!connectedAccount) return null
@@ -144,10 +205,11 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
       connectedAddress,
       isConnected: connectedAccount !== null,
       isConnecting,
+      error,
       connect,
       disconnect,
     }),
-    [wallets, selectedWallet, connectedAccount, connectedAddress, isConnecting, connect, disconnect],
+    [wallets, selectedWallet, connectedAccount, connectedAddress, isConnecting, error, connect, disconnect],
   )
 
   return (

@@ -18,7 +18,6 @@
     "@wallet-standard/react": "^0.2.0",
     "@wallet-standard/app": "^1.1.0",
     "@solana/web3.js": "^1.87.6",
-    "@solana/web3-compat": "^2.1.0",
     "recharts": "^2.10.4",
     "lucide-react": "^0.323.0",
     "clsx": "^2.1.0",

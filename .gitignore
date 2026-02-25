@@ -72,3 +72,4 @@ temp/
 
 # Documentation builds
 docs/_build/
+.vercel

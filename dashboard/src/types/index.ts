@@ -4,6 +4,7 @@
  */
 
 import type { Address } from '@solana/kit'
+import type React from 'react'
 
 // ─── Agent Types ────────────────────────────────────────────────────
 
@@ -143,6 +144,7 @@ export type InsightType = 'positive' | 'warning' | 'info' | 'error'
 
 export interface Insight {
   type: InsightType
+  icon: React.ComponentType<{ className?: string }>
   title: string
   message: string
   confidence: number

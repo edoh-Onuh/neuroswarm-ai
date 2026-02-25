@@ -30,7 +30,7 @@ export default function Dashboard() {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'idle' | 'voting'>('all')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'idle' | 'voting' | 'error'>('all')
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [swarmData, setSwarmData] = useState({
     totalAgents: 0,

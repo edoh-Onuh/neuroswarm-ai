@@ -88,10 +88,25 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
     const seen = new Set<string>()
     const out: WalletEntry[] = []
 
-    const addInjected = (name: string, icon: string, provider: InjectedProvider) => {
+    // Build an icon map from Wallet Standard registry — WS wallets carry the
+    // extension's own base64 icon which is more reliable than external URLs.
+    const api = getWallets()
+    const wsIconMap = new Map<string, string>()
+    for (const w of api.get()) {
+      if (typeof w.icon === 'string' && w.icon) wsIconMap.set(w.name, w.icon)
+    }
+
+    // Fallback icons (used only if WS has no icon for this wallet)
+    const PHANTOM_ICON_FALLBACK =
+      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCIgdmlld0JveD0iMCAwIDQ4IDQ4Ij48cmVjdCB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHJ4PSIxMCIgZmlsbD0iIzU0MERGRiIvPjxwYXRoIGZpbGw9IndoaXRlIiBkPSJNMzcuNSAxNUgxMC41QzkuNyAxNSA5IDE1LjcgOSAxNi41djE1YzAgLjggLjcgMS41IDEuNSAxLjVoMjdjLjggMCAxLjUtLjcgMS41LTEuNXYtMTVjMC0uOC0uNy0xLjUtMS41LTEuNXptLTEzLjUgMTJjLTMuMyAwLTYtMi43LTYtNnMyLjctNiA2LTYgNiAyLjcgNiA2LTIuNyA2LTYgNnoiLz48L3N2Zz4='
+    const SOLFLARE_ICON_FALLBACK =
+      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCI+PHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiByeD0iMTAiIGZpbGw9IiNGRkMxMDAiLz48L3N2Zz4='
+
+    const addInjected = (name: string, fallbackIcon: string, provider: InjectedProvider) => {
       if (!seen.has(name)) {
         seen.add(name)
-        out.push({ name, icon, kind: 'injected', provider })
+        // Prefer WS icon (base64 from extension) over external URL
+        out.push({ name, icon: wsIconMap.get(name) ?? fallbackIcon, kind: 'injected', provider })
       }
     }
 
@@ -100,16 +115,15 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
       window.phantom?.solana ??
       (window.solana?.isPhantom ? window.solana : null)
     if (phantom) {
-      addInjected('Phantom', 'https://www.phantom.app/img/phantom-logo.png', phantom)
+      addInjected('Phantom', PHANTOM_ICON_FALLBACK, phantom)
     }
 
     // 2. Solflare injected
     if (window.solflare) {
-      addInjected('Solflare', 'https://solflare.com/assets/logo.svg', window.solflare)
+      addInjected('Solflare', SOLFLARE_ICON_FALLBACK, window.solflare)
     }
 
     // 3. Other Wallet Standard wallets (Backpack, etc.) — skip Phantom / Solflare (already added)
-    const api = getWallets()
     const wsAll = api.get().filter(
       (w) =>
         !seen.has(w.name) &&
@@ -156,13 +170,18 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
       setWallets((prev) => {
         const prevNames = new Set(prev.map((w) => w.name))
         const toAdd: WalletEntry[] = []
+        // Refresh WS icon map in case Phantom registered after initial render
+        const latestIconMap = new Map<string, string>()
+        for (const w of api.get()) {
+          if (typeof w.icon === 'string' && w.icon) latestIconMap.set(w.name, w.icon)
+        }
         const phantom2 =
           window.phantom?.solana ??
           (window.solana?.isPhantom ? window.solana : null)
         if (phantom2 && !prevNames.has('Phantom')) {
           toAdd.push({
             name: 'Phantom',
-            icon: 'https://www.phantom.app/img/phantom-logo.png',
+            icon: latestIconMap.get('Phantom') ?? PHANTOM_ICON_FALLBACK,
             kind: 'injected',
             provider: phantom2,
           })
@@ -170,12 +189,18 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
         if (window.solflare && !prevNames.has('Solflare')) {
           toAdd.push({
             name: 'Solflare',
-            icon: 'https://solflare.com/assets/logo.svg',
+            icon: latestIconMap.get('Solflare') ?? SOLFLARE_ICON_FALLBACK,
             kind: 'injected',
             provider: window.solflare,
           })
         }
-        return toAdd.length ? [...prev, ...toAdd] : prev
+        // Also update icons for existing entries that had no WS icon yet
+        const updated = prev.map((w) =>
+          latestIconMap.has(w.name) && !w.icon.startsWith('data:image/png;base64,P')
+            ? { ...w, icon: latestIconMap.get(w.name)! }
+            : w
+        )
+        return toAdd.length ? [...updated, ...toAdd] : updated
       })
     }, 600)
 
@@ -201,12 +226,67 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
       if (wallet.kind === 'injected' && wallet.provider) {
         // ── Injected: window.phantom.solana.connect() ──────────────
         const provider = wallet.provider
+
+        // Step 1: Already connected? Use existing publicKey (no popup needed)
+        if (provider.publicKey) {
+          const address = provider.publicKey.toString()
+          setConnectedAddress(address)
+          setSelectedWallet(wallet)
+          const onDisconnect = () => { setSelectedWallet(null); setConnectedAddress(null) }
+          const onAccountChange = (...args: unknown[]) => {
+            const pk = args[0] as { toString(): string } | null
+            if (pk) setConnectedAddress(pk.toString()); else onDisconnect()
+          }
+          provider.on('disconnect', onDisconnect)
+          provider.on('accountChanged', onAccountChange)
+          unsubRef.current = () => {
+            provider.removeListener('disconnect', onDisconnect)
+            provider.removeListener('accountChanged', onAccountChange)
+          }
+          console.log('[Wallet] Connected (already unlocked):', wallet.name, address)
+          return
+        }
+
+        // Step 2: Try silent connect first (no popup, fast fail if not trusted)
+        // This wakes the extension service worker without requiring user interaction.
+        let silentResult: { publicKey: { toString(): string } } | null = null
+        try {
+          silentResult = await Promise.race([
+            provider.connect({ onlyIfTrusted: true }),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('silent timeout')), 3_000)),
+          ])
+        } catch { /* not trusted or timed out — proceed to full connect */ }
+        if (!connectingRef.current) return
+
+        if (silentResult?.publicKey) {
+          // Site was already trusted — got address without a popup
+          const address = silentResult.publicKey.toString()
+          setConnectedAddress(address)
+          setSelectedWallet(wallet)
+          const onDisconnect = () => { setSelectedWallet(null); setConnectedAddress(null) }
+          const onAccountChange = (...args: unknown[]) => {
+            const pk = args[0] as { toString(): string } | null
+            if (pk) setConnectedAddress(pk.toString()); else onDisconnect()
+          }
+          provider.on('disconnect', onDisconnect)
+          provider.on('accountChanged', onAccountChange)
+          unsubRef.current = () => {
+            provider.removeListener('disconnect', onDisconnect)
+            provider.removeListener('accountChanged', onAccountChange)
+          }
+          console.log('[Wallet] Connected (trusted):', wallet.name, address)
+          return
+        }
+
+        // Step 3: Full connect — shows Phantom popup. The silent attempt above
+        // woke the service worker, so this should succeed without the
+        // "Receiving end does not exist" error.
         const result = await Promise.race([
           provider.connect(),
           new Promise<never>((_, reject) =>
             setTimeout(
-              () => reject(new Error('Wallet popup timed out — try again')),
-              30_000,
+              () => reject(new Error('Wallet popup timed out — check your Phantom extension and try again')),
+              60_000,
             ),
           ),
         ])

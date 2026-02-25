@@ -1,33 +1,121 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { TrendingUp, TrendingDown, Eye, EyeOff, RefreshCw, Zap } from 'lucide-react'
+import { TrendingUp, TrendingDown, Eye, EyeOff, RefreshCw, Zap, Wallet } from 'lucide-react'
+import { useWallet } from '@/context/WalletContext'
 
-const portfolioData = [
-  { time: '00:00', value: 385 },
-  { time: '04:00', value: 390 },
-  { time: '08:00', value: 388 },
-  { time: '12:00', value: 395 },
-  { time: '16:00', value: 392 },
-  { time: '20:00', value: 397.5 },
-]
+// ─── Token mints (devnet) ───────────────────────────────────────────
+const SOL_MINT = 'So11111111111111111111111111111111111111112'
+const TOKEN_COLORS: Record<string, string> = {
+  SOL: '#9945FF',
+  USDC: '#14F195',
+  JUP: '#80ecff',
+  BONK: '#FF6B6B',
+}
 
-const allocationData = [
-  { name: 'SOL', value: 50, amount: 198.75, color: '#9945FF' },
-  { name: 'USDC', value: 30, amount: 119.25, color: '#14F195' },
-  { name: 'JUP', value: 10, amount: 39.75, color: '#80ecff' },
-  { name: 'BONK', value: 10, amount: 39.75, color: '#FF6B6B' },
-]
+interface Holding {
+  name: string
+  balance: number
+  valueUsd: number
+  allocation: number
+  change24h: number
+  color: string
+}
+
+interface HistoryPoint {
+  time: string
+  value: number
+}
 
 export default function PortfolioChart() {
+  const { isConnected, connectedAddress } = useWallet()
+  const [holdings, setHoldings] = useState<Holding[]>([])
+  const [history, setHistory] = useState<HistoryPoint[]>([])
+  const [totalValue, setTotalValue] = useState(0)
+  const [prevValue, setPrevValue] = useState(0)
+  const [isLoading, setIsLoading] = useState(false)
   const [selectedToken, setSelectedToken] = useState<string | null>(null)
   const [hiddenTokens, setHiddenTokens] = useState<Set<string>>(new Set())
   const [isRebalancing, setIsRebalancing] = useState(false)
 
-  const totalValue = 397.50
-  const dayChange = 12.50
-  const dayChangePercent = (dayChange / (totalValue - dayChange)) * 100
+  const fetchPortfolio = useCallback(async () => {
+    if (!connectedAddress) return
+    setIsLoading(true)
+    try {
+      // Fetch SOL balance via public RPC
+      const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL ?? 'https://api.devnet.solana.com'
+      const balRes = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0', id: 1,
+          method: 'getBalance',
+          params: [connectedAddress],
+        }),
+      })
+      const balJson = await balRes.json()
+      const solBalance = (balJson?.result?.value ?? 0) / 1e9
+
+      // Fetch SOL price from Jupiter Price API v2
+      let solPrice = 0
+      try {
+        const priceRes = await fetch(`https://api.jup.ag/price/v2?ids=${SOL_MINT}`)
+        if (priceRes.ok) {
+          const priceJson = await priceRes.json()
+          solPrice = parseFloat(priceJson?.data?.[SOL_MINT]?.price ?? '0')
+        }
+      } catch { /* price fetch failed, show 0 */ }
+
+      const solValue = solBalance * solPrice
+      const total = solValue // extend when SPL token balances added
+
+      const holdingsList: Holding[] = []
+      if (solBalance > 0) {
+        holdingsList.push({
+          name: 'SOL',
+          balance: solBalance,
+          valueUsd: solValue,
+          allocation: total > 0 ? (solValue / total) * 100 : 0,
+          change24h: 0, // would need historical price for real change
+          color: TOKEN_COLORS.SOL ?? '#9945FF',
+        })
+      }
+
+      setHoldings(holdingsList)
+      setPrevValue(totalValue)
+      setTotalValue(total)
+
+      // Build simple history (append current value)
+      setHistory(prev => {
+        const now = new Date()
+        const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+        const next = [...prev, { time: timeStr, value: total }]
+        return next.slice(-24) // keep last 24 data points
+      })
+    } catch (err) {
+      console.error('Portfolio fetch error:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [connectedAddress, totalValue])
+
+  // Fetch on connect and periodically
+  useEffect(() => {
+    if (!isConnected || !connectedAddress) {
+      setHoldings([])
+      setHistory([])
+      setTotalValue(0)
+      setPrevValue(0)
+      return
+    }
+    fetchPortfolio()
+    const interval = setInterval(fetchPortfolio, 30_000) // refresh every 30s
+    return () => clearInterval(interval)
+  }, [isConnected, connectedAddress, fetchPortfolio])
+
+  const dayChange = totalValue - prevValue
+  const dayChangePercent = prevValue > 0 ? (dayChange / prevValue) * 100 : 0
 
   const toggleToken = (tokenName: string) => {
     const newHidden = new Set(hiddenTokens)
@@ -44,7 +132,50 @@ export default function PortfolioChart() {
     setTimeout(() => setIsRebalancing(false), 2000)
   }
 
-  const visibleAllocationData = allocationData.filter(token => !hiddenTokens.has(token.name))
+  const visibleHoldings = holdings.filter(h => !hiddenTokens.has(h.name))
+
+  // ─── Not connected ─────────────────────────────────────────────
+  if (!isConnected) {
+    return (
+      <div className="card-gradient rounded-xl p-12 text-center">
+        <Wallet className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-white mb-2">Connect Your Wallet</h2>
+        <p className="text-gray-400 max-w-md mx-auto">
+          Connect a Solana wallet to view your portfolio holdings, balances, and allocation in real time.
+        </p>
+      </div>
+    )
+  }
+
+  // ─── Loading state ─────────────────────────────────────────────
+  if (isLoading && holdings.length === 0) {
+    return (
+      <div className="card-gradient rounded-xl p-12 text-center">
+        <RefreshCw className="w-10 h-10 text-solana-purple mx-auto mb-4 animate-spin" />
+        <p className="text-gray-400">Loading portfolio...</p>
+      </div>
+    )
+  }
+
+  // ─── Empty portfolio ────────────────────────────────────────────
+  if (!isLoading && holdings.length === 0) {
+    return (
+      <div className="card-gradient rounded-xl p-12 text-center">
+        <Wallet className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-white mb-2">No Holdings Found</h2>
+        <p className="text-gray-400 max-w-md mx-auto mb-4">
+          This wallet has no SOL balance on {process.env.NEXT_PUBLIC_RPC_URL?.includes('mainnet') ? 'mainnet' : 'devnet'}.
+        </p>
+        <button
+          onClick={fetchPortfolio}
+          className="px-4 py-2 rounded-lg bg-solana-purple/20 hover:bg-solana-purple/30 border border-solana-purple/50 text-white text-sm font-medium transition-colors"
+        >
+          <RefreshCw className="w-4 h-4 inline mr-2" />
+          Refresh
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -68,7 +199,7 @@ export default function PortfolioChart() {
         {/* Chart */}
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={portfolioData}>
+            <AreaChart data={history}>
               <defs>
                 <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#9945FF" stopOpacity={0.3}/>
@@ -84,7 +215,7 @@ export default function PortfolioChart() {
               <YAxis 
                 stroke="rgba(255,255,255,0.5)"
                 style={{ fontSize: '12px' }}
-                domain={[380, 400]}
+                domain={['auto', 'auto']}
               />
               <Tooltip 
                 contentStyle={{
@@ -123,16 +254,16 @@ export default function PortfolioChart() {
             </button>
           </div>
           <div className="h-64 flex items-center justify-center relative">
-            {visibleAllocationData.length > 0 ? (
+            {visibleHoldings.length > 0 ? (
               <>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={visibleAllocationData}
+                      data={visibleHoldings.map(h => ({ name: h.name, value: h.allocation, color: h.color }))}
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={(entry) => `${entry.name} ${entry.value}%`}
+                      label={(entry) => `${entry.name} ${Math.round(entry.value)}%`}
                       outerRadius={selectedToken ? 75 : 80}
                       innerRadius={selectedToken ? 40 : 0}
                       fill="#8884d8"
@@ -141,7 +272,7 @@ export default function PortfolioChart() {
                       onMouseEnter={(data) => setSelectedToken(data.name)}
                       onMouseLeave={() => setSelectedToken(null)}
                     >
-                      {visibleAllocationData.map((entry, index) => (
+                      {visibleHoldings.map((entry, index) => (
                         <Cell 
                           key={`cell-${index}`} 
                           fill={entry.color}
@@ -165,7 +296,7 @@ export default function PortfolioChart() {
                     <div className="bg-gray-900/90 rounded-lg p-4 border border-solana-purple/50">
                       <p className="text-white font-bold text-xl">{selectedToken}</p>
                       <p className="text-gray-400 text-sm">
-                        {allocationData.find(t => t.name === selectedToken)?.value}% allocation
+                        {holdings.find(t => t.name === selectedToken)?.allocation.toFixed(0)}% allocation
                       </p>
                     </div>
                   </div>
@@ -186,11 +317,11 @@ export default function PortfolioChart() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-white">Holdings</h3>
             <div className="text-xs text-gray-400">
-              {visibleAllocationData.length} / {allocationData.length} visible
+              {visibleHoldings.length} / {holdings.length} visible
             </div>
           </div>
           <div className="space-y-3">
-            {allocationData.map((token) => {
+            {holdings.map((token) => {
               const isHidden = hiddenTokens.has(token.name)
               const isSelected = selectedToken === token.name
               
@@ -212,7 +343,7 @@ export default function PortfolioChart() {
                   <div 
                     className="absolute inset-0 rounded-lg opacity-20 transition-all"
                     style={{ 
-                      background: `linear-gradient(to right, ${token.color} ${isHidden ? 0 : token.value}%, transparent ${isHidden ? 0 : token.value}%)`,
+                      background: `linear-gradient(to right, ${token.color} ${isHidden ? 0 : token.allocation}%, transparent ${isHidden ? 0 : token.allocation}%)`,
                     }}
                   />
                   
@@ -233,24 +364,17 @@ export default function PortfolioChart() {
                           {!isHidden && isSelected && <Eye className="w-4 h-4 text-solana-green animate-pulse" />}
                         </div>
                         <div className="flex items-center space-x-2 text-sm text-gray-400">
-                          <span>{token.value}% allocation</span>
-                          {!isHidden && (
-                            <>
-                              <span>•</span>
-                              <span className="text-green-400 flex items-center space-x-1">
-                                <TrendingUp className="w-3 h-3" />
-                                <span>+2.5%</span>
-                              </span>
-                            </>
-                          )}
+                          <span>{token.allocation.toFixed(0)}% allocation</span>
+                          <span>•</span>
+                          <span className="text-gray-300">{token.balance.toFixed(4)} {token.name}</span>
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
                       {!isHidden && (
                         <>
-                          <div className="font-semibold text-white">${token.amount.toFixed(2)}</div>
-                          <div className="text-sm text-green-400">+2.5%</div>
+                          <div className="font-semibold text-white">${token.valueUsd.toFixed(2)}</div>
+                          <div className="text-sm text-gray-400">{token.balance.toFixed(4)}</div>
                         </>
                       )}
                       {isHidden && (

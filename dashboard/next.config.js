@@ -1,6 +1,36 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+
+  // ── Security Headers ──────────────────────────────────────────────
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          // Prevent MIME-type sniffing
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          // Block framing (clickjacking)
+          { key: 'X-Frame-Options', value: 'DENY' },
+          // Disable XSS auditor (deprecated but harmless; modern sites use CSP)
+          { key: 'X-XSS-Protection', value: '1; mode=block' },
+          // Don't leak referrer to third-parties
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          // Only allow features needed by the app
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+          },
+          // HSTS – 1 year, include subdomains
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains',
+          },
+        ],
+      },
+    ]
+  },
+
   webpack: (config) => {
     config.resolve.fallback = {
       fs: false,

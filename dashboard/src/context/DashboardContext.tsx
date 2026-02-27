@@ -49,6 +49,31 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Use a ref so the health-check effect can always read the latest addNotification
+  // without having to re-subscribe the interval.
+  const addNotificationRef = useRef<(n: Omit<Notification, 'id' | 'timestamp'>) => void>(() => {})
+
+  const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp'>) => {
+    const newNotification: Notification = {
+      ...notification,
+      id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2, 11),
+      timestamp: Date.now(),
+    }
+    setNotifications(prev => [newNotification, ...prev].slice(0, 20))
+
+    // Auto-dismiss success/info after 5s
+    if (notification.type === 'success' || notification.type === 'info') {
+      setTimeout(() => {
+        setNotifications(prev => prev.filter(n => n.id !== newNotification.id))
+      }, 5000)
+    }
+  }, [])
+
+  // Keep ref in sync with the latest stable callback
+  useEffect(() => {
+    addNotificationRef.current = addNotification
+  }, [addNotification])
+
   // Real RPC health check
   useEffect(() => {
     let cancelled = false
@@ -72,9 +97,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         const nowConnected = json.result === 'ok'
         setIsConnected((prev) => {
           if (!prev && nowConnected)
-            addNotification({ type: 'success', title: 'Connected', message: 'Solana RPC connection established' })
+            addNotificationRef.current({ type: 'success', title: 'Connected', message: 'Solana RPC connection established' })
           else if (prev && !nowConnected)
-            addNotification({ type: 'error', title: 'Disconnected', message: 'Lost Solana RPC connection' })
+            addNotificationRef.current({ type: 'error', title: 'Disconnected', message: 'Lost Solana RPC connection' })
           return nowConnected
         })
       } catch (err) {
@@ -90,28 +115,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       cancelled = true
       clearInterval(interval)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // stable – uses addNotificationRef so no stale closure
 
   // Apply theme to document
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
-
-  const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp'>) => {
-    const newNotification: Notification = {
-      ...notification,
-      id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2, 11),
-      timestamp: Date.now(),
-    }
-    setNotifications(prev => [newNotification, ...prev].slice(0, 20))
-
-    // Auto-dismiss success/info after 5s
-    if (notification.type === 'success' || notification.type === 'info') {
-      setTimeout(() => {
-        setNotifications(prev => prev.filter(n => n.id !== newNotification.id))
-      }, 5000)
-    }
-  }, [])
 
   const dismissNotification = useCallback((id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id))

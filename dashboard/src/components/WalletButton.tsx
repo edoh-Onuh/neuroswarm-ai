@@ -54,6 +54,7 @@ export default function WalletButton() {
               src={selectedWallet.icon}
               alt={selectedWallet.name}
               className="w-4 h-4 rounded"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
             />
           )}
           <span className="text-sm font-medium text-white">
@@ -180,6 +181,7 @@ export default function WalletButton() {
                       src={wallet.icon}
                       alt={wallet.name}
                       className="w-6 h-6 rounded"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
                     />
                   )}
                   <span className="text-sm text-white">{wallet.name}</span>

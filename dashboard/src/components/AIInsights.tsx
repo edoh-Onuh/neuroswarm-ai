@@ -9,8 +9,8 @@ export default function AIInsights() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Simulate AI analysis
-    setTimeout(() => {
+    // Simulate AI analysis — clear timer on unmount to avoid state updates on dead component
+    const timerId = setTimeout(() => {
       setInsights([
         {
           type: 'positive',
@@ -35,7 +35,8 @@ export default function AIInsights() {
         }
       ])
       setIsLoading(false)
-    }, 2000)
+    }, 1500)
+    return () => clearTimeout(timerId)
   }, [])
 
   return (

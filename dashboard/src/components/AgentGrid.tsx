@@ -143,56 +143,67 @@ export default function AgentGrid({
       )}
 
       <div className="space-y-4">
-        {agents.map((agent) => {
-          const Icon = getAgentIcon(agent.type)
-          
-          return (
-            <div
-              key={agent.id}
-              onClick={() => onAgentClick?.(agent)}
-              className="bg-white/5 rounded-lg p-4 hover:bg-white/10 transition-all border border-white/10 cursor-pointer hover:scale-[1.02] hover:border-solana-purple/50 hover:shadow-lg group"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-start space-x-4">
-                  <div className="p-3 bg-gradient-to-br from-solana-purple to-solana-green rounded-lg group-hover:scale-110 transition-transform">
-                    <Icon className="w-6 h-6 text-white" />
+        {agents.length === 0 ? (
+          <div className="py-12 text-center text-gray-500">
+            <Activity className="w-10 h-10 mx-auto mb-3 opacity-40" />
+            <p className="text-sm">No agents match your search.</p>
+          </div>
+        ) : (
+          agents.map((agent) => {
+            const Icon = getAgentIcon(agent.type)
+            
+            return (
+              <div
+                key={agent.id}
+                role={onAgentClick ? 'button' : undefined}
+                tabIndex={onAgentClick ? 0 : undefined}
+                onKeyDown={onAgentClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAgentClick(agent) } } : undefined}
+                onClick={() => onAgentClick?.(agent)}
+                className="bg-white/5 rounded-lg p-4 hover:bg-white/10 transition-all border border-white/10 cursor-pointer hover:scale-[1.02] hover:border-solana-purple/50 hover:shadow-lg group focus-visible:ring-2 focus-visible:ring-solana-purple"
+                aria-label={`${agent.name} – ${agent.status}`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-4">
+                    <div className="p-3 bg-gradient-to-br from-solana-purple to-solana-green rounded-lg group-hover:scale-110 transition-transform">
+                      <Icon className="w-6 h-6 text-white" />
+                    </div>
+                    
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <h3 className="font-semibold text-white text-sm sm:text-base truncate">{agent.name}</h3>
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getStatusColor(agent.status)}`} />
+                      </div>
+                      <p className="text-xs sm:text-sm text-gray-400 mb-2 truncate">{agent.id}</p>
+                      
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+                        <div>
+                          <span className="text-gray-400">Reputation:</span>
+                          <span className="text-green-400 ml-1 font-medium">{agent.reputation}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400">Votes:</span>
+                          <span className="text-blue-400 ml-1 font-medium">{agent.votescast}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400">Success:</span>
+                          <span className="text-green-400 ml-1 font-medium">{agent.successRate}%</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <h3 className="font-semibold text-white text-sm sm:text-base truncate">{agent.name}</h3>
-                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getStatusColor(agent.status)}`} />
-                    </div>
-                    <p className="text-xs sm:text-sm text-gray-400 mb-2 truncate">{agent.id}</p>
-                    
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm">
-                      <div>
-                        <span className="text-gray-400">Reputation:</span>
-                        <span className="text-green-400 ml-1 font-medium">{agent.reputation}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">Votes:</span>
-                        <span className="text-blue-400 ml-1 font-medium">{agent.votescast}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">Success:</span>
-                        <span className="text-green-400 ml-1 font-medium">{agent.successRate}%</span>
-                      </div>
-                    </div>
-                  </div>
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                    agent.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                    agent.status === 'voting' ? 'bg-blue-500/20 text-blue-400' :
+                    'bg-gray-500/20 text-gray-400'
+                  }`}>
+                    {agent.status.charAt(0).toUpperCase() + agent.status.slice(1)}
+                  </span>
                 </div>
-                
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  agent.status === 'active' ? 'bg-green-500/20 text-green-400' :
-                  agent.status === 'voting' ? 'bg-blue-500/20 text-blue-400' :
-                  'bg-gray-500/20 text-gray-400'
-                }`}>
-                  {agent.status.charAt(0).toUpperCase() + agent.status.slice(1)}
-                </span>
               </div>
-            </div>
-          )
-        })}
+            )
+          })
+        )}
       </div>
     </div>
   )

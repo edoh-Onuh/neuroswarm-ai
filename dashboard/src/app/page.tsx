@@ -217,7 +217,11 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center space-x-2">
               <span className={`inline-block w-2 h-2 rounded-full ${isDashboardConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></span>
-              <span>{isDashboardConnected ? 'Connected to Devnet' : 'Offline'}</span>
+              <span>
+                {isDashboardConnected
+                  ? `Connected to ${process.env.NEXT_PUBLIC_CLUSTER === 'mainnet' ? 'Mainnet' : process.env.NEXT_PUBLIC_CLUSTER === 'testnet' ? 'Testnet' : 'Devnet'}`
+                  : 'Offline'}
+              </span>
             </div>
           </div>
         </div>

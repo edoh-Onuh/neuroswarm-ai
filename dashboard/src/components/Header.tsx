@@ -6,6 +6,11 @@ import { useDashboard } from '@/context/DashboardContext'
 import WalletButton from '@/components/WalletButton'
 import { PROGRAM_ID } from '@/lib/solana/client'
 
+const CLUSTER = (process.env.NEXT_PUBLIC_CLUSTER ?? 'mainnet') as 'mainnet' | 'devnet' | 'testnet'
+const CLUSTER_LABEL: Record<typeof CLUSTER, string> = { mainnet: 'Mainnet', devnet: 'Devnet', testnet: 'Testnet' }
+// Solana Explorer accepts 'mainnet-beta' for mainnet
+const explorerCluster = CLUSTER === 'mainnet' ? 'mainnet-beta' : CLUSTER
+
 export default function Header() {
   const { refreshData, isRefreshing, notifications, dismissNotification, clearNotifications, isConnected, theme, toggleTheme } = useDashboard()
   const [copied, setCopied] = useState(false)
@@ -199,10 +204,11 @@ export default function Header() {
             
             {/* Explorer */}
             <a
-              href={`https://explorer.solana.com/address/${programId}?cluster=devnet`}
+              href={`https://explorer.solana.com/address/${programId}?cluster=${explorerCluster}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-solana-purple/20 hover:bg-solana-purple/30 border border-solana-purple/50 transition-all glow"
+              aria-label={`Open in Solana Explorer (${CLUSTER_LABEL[CLUSTER]})`}
             >
               <span className="text-sm font-medium">Explorer</span>
               <ExternalLink className="w-4 h-4" />
@@ -309,7 +315,7 @@ export default function Header() {
                     </a>
 
                     {/* Explorer */}
-                    <a href={`https://explorer.solana.com/address/${programId}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors">
+                    <a href={`https://explorer.solana.com/address/${programId}?cluster=${explorerCluster}`} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors">
                       <ExternalLink className="w-4 h-4 text-gray-400" />
                       <span className="text-sm text-white">Solana Explorer</span>
                     </a>
@@ -317,8 +323,8 @@ export default function Header() {
                     {/* Status */}
                     <div className="pt-2 border-t border-white/10 px-3 py-2">
                       <div className="flex items-center space-x-2 text-xs text-gray-400">
-                        <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`} />
-                        <span>{isConnected ? 'Connected to Devnet' : 'Offline'}</span>
+                        <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
+                        <span>{isConnected ? `Connected to ${CLUSTER_LABEL[CLUSTER]}` : 'Offline'}</span>
                       </div>
                     </div>
                   </div>

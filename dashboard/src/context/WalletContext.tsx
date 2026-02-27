@@ -227,91 +227,56 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
         // ── Injected: window.phantom.solana.connect() ──────────────
         const provider = wallet.provider
 
+        // Helper: attach disconnect / accountChanged listeners and store cleanup
+        const attachListeners = () => {
+          const onDisconnect = () => {
+            setSelectedWallet(null)
+            setConnectedAddress(null)
+          }
+          const onAccountChange = (...args: unknown[]) => {
+            const pk = args[0] as { toString(): string } | null
+            if (pk) setConnectedAddress(pk.toString())
+            else onDisconnect()
+          }
+          provider.on('disconnect', onDisconnect)
+          provider.on('accountChanged', onAccountChange)
+          unsubRef.current = () => {
+            provider.removeListener('disconnect', onDisconnect)
+            provider.removeListener('accountChanged', onAccountChange)
+          }
+        }
+
         // Step 1: Already connected? Use existing publicKey (no popup needed)
         if (provider.publicKey) {
           const address = provider.publicKey.toString()
           setConnectedAddress(address)
           setSelectedWallet(wallet)
-          const onDisconnect = () => { setSelectedWallet(null); setConnectedAddress(null) }
-          const onAccountChange = (...args: unknown[]) => {
-            const pk = args[0] as { toString(): string } | null
-            if (pk) setConnectedAddress(pk.toString()); else onDisconnect()
-          }
-          provider.on('disconnect', onDisconnect)
-          provider.on('accountChanged', onAccountChange)
-          unsubRef.current = () => {
-            provider.removeListener('disconnect', onDisconnect)
-            provider.removeListener('accountChanged', onAccountChange)
-          }
+          attachListeners()
           console.log('[Wallet] Connected (already unlocked):', wallet.name, address)
           return
         }
 
-        // Step 2: Try silent connect first (no popup, fast fail if not trusted)
-        // This wakes the extension service worker without requiring user interaction.
-        let silentResult: { publicKey: { toString(): string } } | null = null
-        try {
-          silentResult = await Promise.race([
-            provider.connect({ onlyIfTrusted: true }),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('silent timeout')), 3_000)),
-          ])
-        } catch { /* not trusted or timed out — proceed to full connect */ }
-        if (!connectingRef.current) return
-
-        if (silentResult?.publicKey) {
-          // Site was already trusted — got address without a popup
-          const address = silentResult.publicKey.toString()
-          setConnectedAddress(address)
-          setSelectedWallet(wallet)
-          const onDisconnect = () => { setSelectedWallet(null); setConnectedAddress(null) }
-          const onAccountChange = (...args: unknown[]) => {
-            const pk = args[0] as { toString(): string } | null
-            if (pk) setConnectedAddress(pk.toString()); else onDisconnect()
-          }
-          provider.on('disconnect', onDisconnect)
-          provider.on('accountChanged', onAccountChange)
-          unsubRef.current = () => {
-            provider.removeListener('disconnect', onDisconnect)
-            provider.removeListener('accountChanged', onAccountChange)
-          }
-          console.log('[Wallet] Connected (trusted):', wallet.name, address)
-          return
-        }
-
-        // Step 3: Full connect — shows Phantom popup. The silent attempt above
-        // woke the service worker, so this should succeed without the
-        // "Receiving end does not exist" error.
+        // Step 2: Full connect — shows Phantom popup.
+        // We skip the onlyIfTrusted "wakeup" step because in newer Phantom MV3
+        // builds it can resolve before the SW is ready, causing the subsequent
+        // connect() to hang silently. A direct connect() is more reliable.
         const result = await Promise.race([
           provider.connect(),
           new Promise<never>((_, reject) =>
             setTimeout(
-              () => reject(new Error('Wallet popup timed out — check your Phantom extension and try again')),
+              () => reject(new Error('Wallet popup timed out — make sure Phantom is open and try again')),
               60_000,
             ),
           ),
         ])
         if (!connectingRef.current) return
 
-        const address = result.publicKey.toString()
+        const address = result?.publicKey?.toString?.()
+        if (!address) throw new Error('No public key returned — wallet may be locked')
+
         setConnectedAddress(address)
         setSelectedWallet(wallet)
-
-        // Handle external disconnects & account switches
-        const onDisconnect = () => {
-          setSelectedWallet(null)
-          setConnectedAddress(null)
-        }
-        const onAccountChange = (...args: unknown[]) => {
-          const pk = args[0] as { toString(): string } | null
-          if (pk) setConnectedAddress(pk.toString())
-          else onDisconnect()
-        }
-        provider.on('disconnect', onDisconnect)
-        provider.on('accountChanged', onAccountChange)
-        unsubRef.current = () => {
-          provider.removeListener('disconnect', onDisconnect)
-          provider.removeListener('accountChanged', onAccountChange)
-        }
+        attachListeners()
         console.log('[Wallet] Connected (injected):', wallet.name, address)
 
       } else if (wallet.kind === 'standard' && wallet.wsWallet) {
@@ -366,8 +331,16 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       if (!connectingRef.current) return // user cancelled
-      const message = err instanceof Error ? err.message : 'Connection failed'
-      console.error('[Wallet] Connect error:', message)
+      const code = (err as { code?: number })?.code
+      const message =
+        code === 4001
+          ? 'Connection rejected — please approve in your wallet'
+          : code === -32002
+          ? 'Wallet request already pending — open your extension to approve'
+          : err instanceof Error
+          ? err.message
+          : 'Connection failed'
+      console.error('[Wallet] Connect error:', message, err)
       setError(message)
       setSelectedWallet(null)
       setConnectedAddress(null)

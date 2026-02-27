@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { useSolana } from '@/context/SolanaContext'
+import { useWallet } from '@/context/WalletContext'
 import { fetchSwarmState } from '@/lib/solana/client'
 // ── Always-visible components (loaded in the initial bundle) ──────────────
 import AgentGrid from '@/components/AgentGrid'
@@ -28,6 +29,7 @@ import type { Agent, Proposal } from '@/types'
 export default function Dashboard() {
   const { isConnected: isDashboardConnected, isRefreshing, refreshCounter, activeTab, setActiveTab } = useDashboard()
   const { rpc } = useSolana()
+  const { isConnected: isWalletConnected, connectedAddress } = useWallet()
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -64,6 +66,85 @@ export default function Dashboard() {
     const interval = setInterval(fetchState, 30_000)
     return () => clearInterval(interval)
   }, [rpc, refreshCounter])
+
+  // ─── Lightweight wallet portfolio value fetch ─────────────────────
+  // Mirrors the same RPC + CoinGecko logic from PortfolioChart, but
+  // only fetches the dollar total so the Overview MetricsPanel always
+  // shows the correct value regardless of which tab is active.
+  const fetchPortfolioValue = useCallback(async () => {
+    if (!connectedAddress) return
+
+    const RPC_ENDPOINTS = [
+      process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL,
+      'https://solana-mainnet.g.alchemy.com/v2/demo',
+      'https://rpc.ankr.com/solana',
+      'https://solana.public-rpc.com',
+    ].filter(Boolean) as string[]
+
+    try {
+      // 1. Fetch SOL balance
+      let balJson: { result?: { value?: number } } | null = null
+      for (const rpcUrl of RPC_ENDPOINTS) {
+        try {
+          const res = await fetch(rpcUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0', id: 1,
+              method: 'getBalance',
+              params: [connectedAddress],
+            }),
+          })
+          if (res.ok) {
+            balJson = await res.json()
+            if (balJson?.result?.value !== undefined) break
+          }
+        } catch { /* try next */ }
+      }
+      const solBalance = ((balJson?.result?.value) ?? 0) / 1e9
+
+      // 2. Fetch SOL price (CoinGecko → Jupiter fallback)
+      let solPrice = 0
+      try {
+        const cgRes = await fetch(
+          'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd',
+        )
+        if (cgRes.ok) {
+          const cg = await cgRes.json()
+          solPrice = cg?.solana?.usd ?? 0
+        }
+      } catch { /* CoinGecko failed */ }
+
+      if (!solPrice) {
+        try {
+          const jpRes = await fetch(
+            `https://api.jup.ag/price/v2?ids=So11111111111111111111111111111111111111112`,
+          )
+          if (jpRes.ok) {
+            const jp = await jpRes.json()
+            solPrice = parseFloat(
+              jp?.data?.['So11111111111111111111111111111111111111112']?.price ?? '0',
+            )
+          }
+        } catch { /* Jupiter failed */ }
+      }
+
+      const total = solBalance * solPrice
+      setSwarmData((prev) => ({ ...prev, portfolioValue: total }))
+    } catch (err) {
+      console.error('[Overview] Portfolio value fetch error:', err)
+    }
+  }, [connectedAddress])
+
+  useEffect(() => {
+    if (!isWalletConnected || !connectedAddress) {
+      setSwarmData((prev) => ({ ...prev, portfolioValue: 0 }))
+      return
+    }
+    fetchPortfolioValue()
+    const interval = setInterval(fetchPortfolioValue, 30_000)
+    return () => clearInterval(interval)
+  }, [isWalletConnected, connectedAddress, fetchPortfolioValue])
 
   // Stable tab config — memoized so tab bar never causes a cascade re-render
   const tabs = useMemo(() => [

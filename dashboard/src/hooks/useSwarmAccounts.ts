@@ -66,7 +66,7 @@ function formatTimeLeft(expiresAt: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`
 }
 
-function proposalStatus(p: ProposalAccountData): LiveProposal['status'] {
+function proposalStatus(p: ProposalAccountData): ProposalStatus {
   if (p.executed) return 'executed'
   const now = Math.floor(Date.now() / 1000)
   if (p.expiresAt < now) {

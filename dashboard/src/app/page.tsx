@@ -1,32 +1,33 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import { useSolana } from '@/context/SolanaContext'
-import { useWallet } from '@/context/WalletContext'
-import { fetchSwarmState, type SwarmStateData } from '@/lib/solana/client'
+import { fetchSwarmState } from '@/lib/solana/client'
+// ── Always-visible components (loaded in the initial bundle) ──────────────
 import AgentGrid from '@/components/AgentGrid'
 import ProposalList from '@/components/ProposalList'
 import MetricsPanel from '@/components/MetricsPanel'
 import Header from '@/components/Header'
-import PortfolioChart from '@/components/PortfolioChart'
-import GovernancePanel from '@/components/GovernancePanel'
 import AgentModal from '@/components/AgentModal'
 import ProposalModal from '@/components/ProposalModal'
 import NotificationCenter from '@/components/NotificationCenter'
-import CommandPalette from '@/components/CommandPalette'
 import ExportPanel from '@/components/ExportPanel'
 import AIInsights from '@/components/AIInsights'
-import SentimentPanel from '@/components/SentimentPanel'
-import ArbitragePanel from '@/components/ArbitragePanel'
-import MarketplacePanel from '@/components/MarketplacePanel'
-import { Activity, TrendingUp, Users, Vote, Loader2, BarChart3, Building, Search, ArrowRightLeft, ShoppingBag } from 'lucide-react'
+// ── Heavy panels — loaded only when the user first opens that tab ─────────
+const CommandPalette = dynamic(() => import('@/components/CommandPalette'), { ssr: false })
+const PortfolioChart  = dynamic(() => import('@/components/PortfolioChart'),  { ssr: false })
+const GovernancePanel = dynamic(() => import('@/components/GovernancePanel'), { ssr: false })
+const SentimentPanel  = dynamic(() => import('@/components/SentimentPanel'),  { ssr: false })
+const ArbitragePanel  = dynamic(() => import('@/components/ArbitragePanel'),  { ssr: false })
+const MarketplacePanel= dynamic(() => import('@/components/MarketplacePanel'),{ ssr: false })
+import { TrendingUp, Users, Vote, Loader2, BarChart3, Building, Search, ArrowRightLeft, ShoppingBag } from 'lucide-react'
 import { useDashboard } from '@/context/DashboardContext'
 import type { Agent, Proposal } from '@/types'
 
 export default function Dashboard() {
   const { isConnected: isDashboardConnected, isRefreshing, refreshCounter, activeTab, setActiveTab } = useDashboard()
   const { rpc } = useSolana()
-  const { isConnected: isWalletConnected, connectedAddress } = useWallet()
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -64,23 +65,8 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [rpc, refreshCounter])
 
-  // Keyboard shortcuts for tab switching
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      // Don't fire when inside an input/textarea or when modifier keys are pressed (except for Ctrl+K)
-      const target = e.target as HTMLElement
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return
-      if (e.ctrlKey || e.metaKey || e.altKey) return
-
-      switch (e.key.toLowerCase()) {
-        case 'r': e.preventDefault(); break // handled by DashboardContext
-      }
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [])
-
-  const tabs = [
+  // Stable tab config — memoized so tab bar never causes a cascade re-render
+  const tabs = useMemo(() => [
     { id: 'overview' as const, label: 'Overview', icon: BarChart3 },
     { id: 'agents' as const, label: 'Agents', icon: Users },
     { id: 'proposals' as const, label: 'Proposals', icon: Vote },
@@ -89,7 +75,7 @@ export default function Dashboard() {
     { id: 'sentiment' as const, label: 'Sentiment', icon: Search },
     { id: 'arbitrage' as const, label: 'Arbitrage', icon: ArrowRightLeft },
     { id: 'marketplace' as const, label: 'Marketplace', icon: ShoppingBag },
-  ]
+  ], [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900">

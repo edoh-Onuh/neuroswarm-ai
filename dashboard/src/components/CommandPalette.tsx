@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Command, Search, BarChart3, Users, Vote, Briefcase, Building, TrendingUp, ShoppingBag, RefreshCw, Download, Sun, Moon } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { Search, BarChart3, Users, Vote, Briefcase, Building, TrendingUp, ShoppingBag, RefreshCw, Download, Sun, Moon } from 'lucide-react'
 import { useDashboard } from '@/context/DashboardContext'
 
 interface PaletteCommand {
@@ -27,21 +27,29 @@ export default function CommandPalette() {
     setSelectedIndex(0)
   }, [])
 
-  const commands: PaletteCommand[] = [
-    { id: 'overview', label: 'Go to Overview', shortcut: 'O', icon: <BarChart3 className="w-4 h-4" />, action: () => { setActiveTab('overview'); close() }, category: 'navigation' },
-    { id: 'agents', label: 'Go to Agents', shortcut: 'A', icon: <Users className="w-4 h-4" />, action: () => { setActiveTab('agents'); close() }, category: 'navigation' },
-    { id: 'proposals', label: 'Go to Proposals', shortcut: 'P', icon: <Vote className="w-4 h-4" />, action: () => { setActiveTab('proposals'); close() }, category: 'navigation' },
-    { id: 'portfolio', label: 'Go to Portfolio', shortcut: 'F', icon: <Briefcase className="w-4 h-4" />, action: () => { setActiveTab('portfolio'); close() }, category: 'navigation' },
-    { id: 'governance', label: 'Go to Governance', shortcut: 'G', icon: <Building className="w-4 h-4" />, action: () => { setActiveTab('governance'); close() }, category: 'navigation' },
-    { id: 'sentiment', label: 'Go to Sentiment', shortcut: 'S', icon: <TrendingUp className="w-4 h-4" />, action: () => { setActiveTab('sentiment'); close() }, category: 'navigation' },
+  const commands: PaletteCommand[] = useMemo(() => [
+    { id: 'overview',    label: 'Go to Overview',    shortcut: 'O', icon: <BarChart3  className="w-4 h-4" />, action: () => { setActiveTab('overview');    close() }, category: 'navigation' },
+    { id: 'agents',      label: 'Go to Agents',      shortcut: 'A', icon: <Users      className="w-4 h-4" />, action: () => { setActiveTab('agents');      close() }, category: 'navigation' },
+    { id: 'proposals',   label: 'Go to Proposals',   shortcut: 'P', icon: <Vote       className="w-4 h-4" />, action: () => { setActiveTab('proposals');   close() }, category: 'navigation' },
+    { id: 'portfolio',   label: 'Go to Portfolio',   shortcut: 'F', icon: <Briefcase  className="w-4 h-4" />, action: () => { setActiveTab('portfolio');   close() }, category: 'navigation' },
+    { id: 'governance',  label: 'Go to Governance',  shortcut: 'G', icon: <Building   className="w-4 h-4" />, action: () => { setActiveTab('governance');  close() }, category: 'navigation' },
+    { id: 'sentiment',   label: 'Go to Sentiment',   shortcut: 'S', icon: <TrendingUp className="w-4 h-4" />, action: () => { setActiveTab('sentiment');   close() }, category: 'navigation' },
     { id: 'marketplace', label: 'Go to Marketplace', shortcut: 'M', icon: <ShoppingBag className="w-4 h-4" />, action: () => { setActiveTab('marketplace'); close() }, category: 'navigation' },
-    { id: 'refresh', label: 'Refresh Data', shortcut: 'R', icon: <RefreshCw className="w-4 h-4" />, action: () => { refreshData(); close() }, category: 'actions' },
-    { id: 'export', label: 'Export Data', shortcut: 'E', icon: <Download className="w-4 h-4" />, action: () => { setActiveTab('overview'); close(); /* ExportPanel is on overview */ }, category: 'actions' },
-    { id: 'theme', label: `Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`, shortcut: 'T', icon: theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />, action: () => { toggleTheme(); close() }, category: 'actions' },
-  ]
+    { id: 'refresh',     label: 'Refresh Data',      shortcut: 'R', icon: <RefreshCw  className="w-4 h-4" />, action: () => { refreshData(); close() },             category: 'actions' },
+    { id: 'export',      label: 'Export Data',       shortcut: 'E', icon: <Download   className="w-4 h-4" />, action: () => { setActiveTab('overview'); close() },  category: 'actions' },
+    {
+      id: 'theme',
+      label: `Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`,
+      shortcut: 'T',
+      icon: theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />,
+      action: () => { toggleTheme(); close() },
+      category: 'actions' as const,
+    },
+  ], [theme, close, setActiveTab, refreshData, toggleTheme])
 
-  const filteredCommands = commands.filter(cmd =>
-    cmd.label.toLowerCase().includes(search.toLowerCase())
+  const filteredCommands = useMemo(
+    () => commands.filter(cmd => cmd.label.toLowerCase().includes(search.toLowerCase())),
+    [commands, search]
   )
 
   // Keyboard open/close

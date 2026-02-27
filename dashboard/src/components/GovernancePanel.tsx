@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Trophy, TrendingUp, Award } from 'lucide-react'
 
@@ -19,7 +20,7 @@ const leaderboard = [
   { agent: 'Learning Agent', reputation: 100.0, votes: 6, winRate: 100 },
 ]
 
-export default function GovernancePanel() {
+function GovernancePanelInner() {
   return (
     <div className="space-y-6">
       {/* Stats */}
@@ -170,3 +171,7 @@ export default function GovernancePanel() {
     </div>
   )
 }
+
+// Static data, never changes — memo prevents re-render driven by parent refreshes
+const GovernancePanel = memo(GovernancePanelInner)
+export default GovernancePanel

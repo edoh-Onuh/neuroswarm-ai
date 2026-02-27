@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { Users, FileText, CheckCircle, DollarSign } from 'lucide-react'
 
 interface MetricsPanelProps {
@@ -26,7 +27,7 @@ function ChangeBadge({ value }: { value: string }) {
   )
 }
 
-export default function MetricsPanel({ data }: MetricsPanelProps) {
+function MetricsPanelInner({ data }: MetricsPanelProps) {
   const metrics = [
     {
       label: 'Active Agents',
@@ -84,3 +85,6 @@ export default function MetricsPanel({ data }: MetricsPanelProps) {
   )
 }
 
+// Memoize: only re-renders when swarmData values actually change
+const MetricsPanel = memo(MetricsPanelInner)
+export default MetricsPanel

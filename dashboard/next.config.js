@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Strip X-Powered-By: Next.js response header (reduces fingerprinting surface)
+  poweredByHeader: false,
+  // Compress responses with gzip (explicit; Next.js default is true)
+  compress: true,
 
   // ── Security Headers ──────────────────────────────────────────────
   async headers() {

@@ -1,10 +1,10 @@
 'use client'
 
+import { memo, useState, useEffect } from 'react'
 import { Sparkles, TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react'
-import { useState, useEffect } from 'react'
 import type { Insight } from '@/types'
 
-export default function AIInsights() {
+function AIInsightsInner() {
   const [insights, setInsights] = useState<Insight[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -93,3 +93,7 @@ export default function AIInsights() {
     </div>
   )
 }
+
+// Memoized: insights never change after the initial load, so parent refreshes don't re-run this
+const AIInsights = memo(AIInsightsInner)
+export default AIInsights

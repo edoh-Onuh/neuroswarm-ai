@@ -43,19 +43,38 @@ export default function PortfolioChart() {
     if (!connectedAddress) return
     setIsLoading(true)
     try {
-      // Fetch SOL balance via public RPC — default to mainnet-beta (real wallets)
-      const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL ?? 'https://api.mainnet-beta.solana.com'
-      const balRes = await fetch(rpcUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0', id: 1,
-          method: 'getBalance',
-          params: [connectedAddress],
-        }),
-      })
-      const balJson = await balRes.json()
-      const solBalance = (balJson?.result?.value ?? 0) / 1e9
+      // Fetch SOL balance via RPC.
+      // Solana's public api.mainnet-beta.solana.com blocks browser requests (403).
+      // Use free browser-friendly endpoints with fallback chain.
+      const RPC_ENDPOINTS = [
+        process.env.NEXT_PUBLIC_RPC_URL,
+        'https://solana-mainnet.g.alchemy.com/v2/demo',
+        'https://rpc.ankr.com/solana',
+        'https://solana.public-rpc.com',
+      ].filter(Boolean) as string[]
+
+      let balJson: { result?: { value?: number } } | null = null
+      for (const rpcUrl of RPC_ENDPOINTS) {
+        try {
+          const balRes = await fetch(rpcUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0', id: 1,
+              method: 'getBalance',
+              params: [connectedAddress],
+            }),
+          })
+          if (balRes.ok) {
+            balJson = await balRes.json()
+            if (balJson?.result?.value !== undefined) {
+              console.log('[Portfolio] RPC ok:', rpcUrl)
+              break
+            }
+          }
+        } catch { /* try next endpoint */ }
+      }
+      const solBalance = ((balJson?.result?.value) ?? 0) / 1e9
 
       // Fetch SOL price — try multiple free APIs (Jupiter v2 now requires an API key)
       let solPrice = 0
@@ -152,7 +171,7 @@ export default function PortfolioChart() {
     ? 'Devnet'
     : (process.env.NEXT_PUBLIC_RPC_URL ?? '').includes('testnet')
     ? 'Testnet'
-    : 'Mainnet'
+    : 'Mainnet Beta'
 
   const visibleHoldings = holdings.filter(h => !hiddenTokens.has(h.name))
 

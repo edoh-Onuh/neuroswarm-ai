@@ -33,7 +33,7 @@ export default function PortfolioChart() {
   const [holdings, setHoldings] = useState<Holding[]>([])
   const [history, setHistory] = useState<HistoryPoint[]>([])
   const [totalValue, setTotalValue] = useState(0)
-  const [prevValue, setPrevValue] = useState(0)
+  const [prevValue, setPrevValue] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [selectedToken, setSelectedToken] = useState<string | null>(null)
   const [hiddenTokens, setHiddenTokens] = useState<Set<string>>(new Set())
@@ -43,8 +43,8 @@ export default function PortfolioChart() {
     if (!connectedAddress) return
     setIsLoading(true)
     try {
-      // Fetch SOL balance via public RPC
-      const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL ?? 'https://api.devnet.solana.com'
+      // Fetch SOL balance via public RPC — default to mainnet-beta (real wallets)
+      const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL ?? 'https://api.mainnet-beta.solana.com'
       const balRes = await fetch(rpcUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -97,7 +97,9 @@ export default function PortfolioChart() {
       }
 
       setHoldings(holdingsList)
-      setPrevValue(totalValue)
+      // Only set prevValue after we already have a baseline — avoid showing
+      // a false +100% change on first load
+      setPrevValue((prev) => (prev === null ? total : totalValue))
       setTotalValue(total)
 
       // Build simple history (append current value)
@@ -120,7 +122,7 @@ export default function PortfolioChart() {
       setHoldings([])
       setHistory([])
       setTotalValue(0)
-      setPrevValue(0)
+      setPrevValue(null)
       return
     }
     fetchPortfolio()
@@ -128,8 +130,8 @@ export default function PortfolioChart() {
     return () => clearInterval(interval)
   }, [isConnected, connectedAddress, fetchPortfolio])
 
-  const dayChange = totalValue - prevValue
-  const dayChangePercent = prevValue > 0 ? (dayChange / prevValue) * 100 : 0
+  const dayChange = prevValue !== null ? totalValue - prevValue : 0
+  const dayChangePercent = prevValue && prevValue > 0 ? (dayChange / prevValue) * 100 : 0
 
   const toggleToken = (tokenName: string) => {
     const newHidden = new Set(hiddenTokens)
@@ -145,6 +147,12 @@ export default function PortfolioChart() {
     setIsRebalancing(true)
     setTimeout(() => setIsRebalancing(false), 2000)
   }
+
+  const rpcNetwork = (process.env.NEXT_PUBLIC_RPC_URL ?? '').includes('devnet')
+    ? 'Devnet'
+    : (process.env.NEXT_PUBLIC_RPC_URL ?? '').includes('testnet')
+    ? 'Testnet'
+    : 'Mainnet'
 
   const visibleHoldings = holdings.filter(h => !hiddenTokens.has(h.name))
 
@@ -178,7 +186,7 @@ export default function PortfolioChart() {
         <Wallet className="w-16 h-16 text-gray-500 mx-auto mb-4" />
         <h2 className="text-xl font-bold text-white mb-2">No Holdings Found</h2>
         <p className="text-gray-400 max-w-md mx-auto mb-4">
-          This wallet has no SOL balance on {process.env.NEXT_PUBLIC_RPC_URL?.includes('mainnet') ? 'mainnet' : 'devnet'}.
+          This wallet has no SOL balance on {rpcNetwork}.
         </p>
         <button
           onClick={fetchPortfolio}
@@ -202,11 +210,13 @@ export default function PortfolioChart() {
               <span className="text-4xl font-bold text-white">${totalValue.toFixed(2)}</span>
               <div className={`flex items-center space-x-1 ${dayChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 {dayChange >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                <span className="text-lg font-semibold">+${Math.abs(dayChange).toFixed(2)}</span>
-                <span className="text-sm">({dayChangePercent.toFixed(2)}%)</span>
+                <span className="text-lg font-semibold">{dayChange >= 0 ? '+' : '-'}${Math.abs(dayChange).toFixed(2)}</span>
+                <span className="text-sm">({dayChangePercent >= 0 ? '+' : ''}{dayChangePercent.toFixed(2)}%)</span>
               </div>
             </div>
-            <p className="text-sm text-gray-400 mt-1">Last 24 hours</p>
+            <p className="text-sm text-gray-400 mt-1">
+              {rpcNetwork} &middot; Last 24 hours
+            </p>
           </div>
         </div>
 

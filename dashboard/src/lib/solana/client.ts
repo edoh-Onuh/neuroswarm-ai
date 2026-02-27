@@ -26,16 +26,18 @@ export const PROGRAM_ID: Address = address(
   '56Vy8e8V4E6UZnsa6uDRg8HFiPwroz6nRKh7rm9xAfeK'
 )
 
-/** Cluster RPC endpoints — use env vars in production */
+/** Cluster RPC endpoints — use env vars in production.
+ * NOTE: api.mainnet-beta.solana.com blocks browser fetch (403).
+ * Fallback to Ankr's free public endpoint which allows CORS. */
 export const RPC_ENDPOINTS = {
   devnet: 'https://api.devnet.solana.com',
-  mainnet: 'https://api.mainnet-beta.solana.com',
+  mainnet: 'https://rpc.ankr.com/solana',
   localnet: 'http://127.0.0.1:8899',
 } as const
 
 export const WSS_ENDPOINTS = {
   devnet: 'wss://api.devnet.solana.com',
-  mainnet: 'wss://api.mainnet-beta.solana.com',
+  mainnet: 'wss://rpc.ankr.com/solana/ws',
   localnet: 'ws://127.0.0.1:8900',
 } as const
 

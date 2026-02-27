@@ -32,7 +32,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [refreshCounter, setRefreshCounter] = useState(0)
   const [activeTab, setActiveTab] = useState('overview')
   const rpcUrlRef = useRef(
-    process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? 'https://api.devnet.solana.com'
+    process.env.NEXT_PUBLIC_SOLANA_RPC_URL ??
+    process.env.NEXT_PUBLIC_RPC_URL ??
+    (process.env.NEXT_PUBLIC_CLUSTER === 'mainnet'
+      ? 'https://rpc.ankr.com/solana'
+      : 'https://api.devnet.solana.com')
   )
 
   // Validate RPC URL format on mount
@@ -47,12 +51,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   // Real RPC health check
   useEffect(() => {
-    const controller = new AbortController()
+    let cancelled = false
 
     const checkHealth = async () => {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10_000)
       try {
-        // 10-second timeout via AbortSignal
-        const timeoutId = setTimeout(() => controller.abort(), 10_000)
         const res = await fetch(rpcUrlRef.current, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -60,34 +64,30 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           signal: controller.signal,
         })
         clearTimeout(timeoutId)
+        if (cancelled) return
 
-        if (!res.ok) {
-          setIsConnected(false)
-          return
-        }
+        if (!res.ok) { setIsConnected(false); return }
         const json = await res.json()
-        const wasConnected = isConnected
+        if (cancelled) return
         const nowConnected = json.result === 'ok'
-        setIsConnected(nowConnected)
-
-        // Notify on connection state change
-        if (!wasConnected && nowConnected) {
-          addNotification({ type: 'success', title: 'Connected', message: 'Solana RPC connection established' })
-        } else if (wasConnected && !nowConnected) {
-          addNotification({ type: 'error', title: 'Disconnected', message: 'Lost Solana RPC connection' })
-        }
+        setIsConnected((prev) => {
+          if (!prev && nowConnected)
+            addNotification({ type: 'success', title: 'Connected', message: 'Solana RPC connection established' })
+          else if (prev && !nowConnected)
+            addNotification({ type: 'error', title: 'Disconnected', message: 'Lost Solana RPC connection' })
+          return nowConnected
+        })
       } catch (err) {
-        if ((err as Error).name !== 'AbortError') {
-          setIsConnected(false)
-        }
+        clearTimeout(timeoutId)
+        if (!cancelled && (err as Error).name !== 'AbortError') setIsConnected(false)
       }
-      setLastUpdate(Date.now())
+      if (!cancelled) setLastUpdate(Date.now())
     }
 
     checkHealth()
     const interval = setInterval(checkHealth, 30_000)
     return () => {
-      controller.abort()
+      cancelled = true
       clearInterval(interval)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps

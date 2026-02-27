@@ -4,6 +4,7 @@ import './globals.css'
 import { DashboardProvider } from '@/context/DashboardContext'
 import { SolanaProvider } from '@/context/SolanaContext'
 import { WalletStandardProvider } from '@/context/WalletContext'
+import type { Cluster } from '@/lib/solana/client'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -19,6 +20,9 @@ export const viewport = {
   initialScale: 1,
 }
 
+// Read cluster from env — falls back to 'mainnet' (matches Vercel NEXT_PUBLIC_CLUSTER=mainnet)
+const cluster = (process.env.NEXT_PUBLIC_CLUSTER as Cluster | undefined) ?? 'mainnet'
+
 export default function RootLayout({
   children,
 }: {
@@ -27,7 +31,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <SolanaProvider cluster="devnet">
+        <SolanaProvider cluster={cluster}>
           <WalletStandardProvider>
             <DashboardProvider>
               {children}

@@ -257,12 +257,38 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
         }
 
         // Step 2: Connect with retry.
-        // Phantom's MV3 service worker can go dormant. The first connect()
-        // attempt may fail with "Receiving end does not exist" because the
-        // content script's message can't reach the sleeping SW. Chrome will
-        // auto-restart the SW after that failed message, so a second attempt
-        // after a short delay succeeds.
-        const MAX_RETRIES = 2
+        // Phantom MV3 service worker (SW) can go dormant. When that happens,
+        // provider.connect() does NOT reject — it silently hangs because the
+        // content-script → SW port is broken. The browser emits
+        // "Receiving end does not exist" as an unhandled runtime.lastError
+        // but Phantom's injected script swallows it. Our connect call just
+        // waits forever until we time out.
+        //
+        // Fix: first send a SILENT pre-warm request (onlyIfTrusted:true, 3 s
+        // timeout). This either:
+        //   a) Returns a publicKey  → already authorized, use it directly.
+        //   b) Throws/times-out    → doesn't matter; the act of sending the
+        //                            message forces Chrome to restart the SW.
+        // After the pre-warm the SW is alive, so the real connect() call that
+        // follows always reaches an awake extension.
+        const prewarm = await Promise.race([
+          provider.connect({ onlyIfTrusted: true }).catch(() => null),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 3_000)),
+        ])
+        if (!connectingRef.current) return
+        if (prewarm?.publicKey) {
+          // Already authorized — no popup needed
+          const address = prewarm.publicKey.toString()
+          setConnectedAddress(address)
+          setSelectedWallet(wallet)
+          attachListeners()
+          console.log('[Wallet] Connected via silent pre-warm:', wallet.name, address)
+          return
+        }
+        // Give the SW a moment to fully restart after the pre-warm ping
+        await new Promise((r) => setTimeout(r, 500))
+
+        const MAX_RETRIES = 3
         let lastErr: unknown = null
         let connectResult: { publicKey: { toString(): string } } | null = null
 
@@ -274,7 +300,7 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
               new Promise<never>((_, reject) =>
                 setTimeout(
                   () => reject(new Error('Wallet popup timed out — make sure Phantom is open and try again')),
-                  attempt === 0 ? 15_000 : 60_000, // shorter first timeout for quick retry
+                  attempt === 0 ? 10_000 : 60_000,
                 ),
               ),
             ])
@@ -286,11 +312,12 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
             const isSwError =
               msg.includes('Receiving end does not exist') ||
               msg.includes('disconnected port') ||
+              msg.includes('Could not establish connection') ||
               msg.includes('timed out')
             if (!isSwError || attempt === MAX_RETRIES - 1) throw e
-            console.warn(`[Wallet] Attempt ${attempt + 1} failed (SW dormant?), retrying in 1s…`, msg)
-            // Give the SW time to fully restart before retrying
-            await new Promise((r) => setTimeout(r, 1_000))
+            console.warn(`[Wallet] Attempt ${attempt + 1} failed (SW dormant?), retrying in 2s…`, msg)
+            // Give the SW enough time to fully restart before retrying
+            await new Promise((r) => setTimeout(r, 2_000))
           }
         }
         if (lastErr) throw lastErr

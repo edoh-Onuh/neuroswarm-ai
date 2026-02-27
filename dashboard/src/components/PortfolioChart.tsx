@@ -57,15 +57,29 @@ export default function PortfolioChart() {
       const balJson = await balRes.json()
       const solBalance = (balJson?.result?.value ?? 0) / 1e9
 
-      // Fetch SOL price from Jupiter Price API v2
+      // Fetch SOL price — try multiple free APIs (Jupiter v2 now requires an API key)
       let solPrice = 0
       try {
-        const priceRes = await fetch(`https://api.jup.ag/price/v2?ids=${SOL_MINT}`)
-        if (priceRes.ok) {
-          const priceJson = await priceRes.json()
-          solPrice = parseFloat(priceJson?.data?.[SOL_MINT]?.price ?? '0')
+        // 1. CoinGecko free API (no key needed, 30 req/min)
+        const cgRes = await fetch(
+          'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd',
+        )
+        if (cgRes.ok) {
+          const cgJson = await cgRes.json()
+          solPrice = cgJson?.solana?.usd ?? 0
         }
-      } catch { /* price fetch failed, show 0 */ }
+      } catch { /* CoinGecko failed */ }
+
+      if (!solPrice) {
+        try {
+          // 2. Fallback: Jupiter Price API v2 (may 401 without key)
+          const priceRes = await fetch(`https://api.jup.ag/price/v2?ids=${SOL_MINT}`)
+          if (priceRes.ok) {
+            const priceJson = await priceRes.json()
+            solPrice = parseFloat(priceJson?.data?.[SOL_MINT]?.price ?? '0')
+          }
+        } catch { /* price fetch failed */ }
+      }
 
       const solValue = solBalance * solPrice
       const total = solValue // extend when SPL token balances added

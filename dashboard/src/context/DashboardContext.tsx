@@ -32,7 +32,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [refreshCounter, setRefreshCounter] = useState(0)
   const [activeTab, setActiveTab] = useState('overview')
   const rpcUrlRef = useRef(
-    process.env.NEXT_PUBLIC_RPC_URL ?? 'https://api.devnet.solana.com'
+    process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? 'https://api.devnet.solana.com'
   )
 
   // Validate RPC URL format on mount
@@ -40,7 +40,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     try {
       new URL(rpcUrlRef.current)
     } catch {
-      console.error('Invalid NEXT_PUBLIC_RPC_URL:', rpcUrlRef.current)
+      console.error('Invalid NEXT_PUBLIC_SOLANA_RPC_URL:', rpcUrlRef.current)
       rpcUrlRef.current = 'https://api.devnet.solana.com'
     }
   }, [])

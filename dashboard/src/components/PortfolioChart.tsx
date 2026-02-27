@@ -47,7 +47,7 @@ export default function PortfolioChart() {
       // Solana's public api.mainnet-beta.solana.com blocks browser requests (403).
       // Use free browser-friendly endpoints with fallback chain.
       const RPC_ENDPOINTS = [
-        process.env.NEXT_PUBLIC_RPC_URL,
+        process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL,
         'https://solana-mainnet.g.alchemy.com/v2/demo',
         'https://rpc.ankr.com/solana',
         'https://solana.public-rpc.com',
@@ -167,9 +167,10 @@ export default function PortfolioChart() {
     setTimeout(() => setIsRebalancing(false), 2000)
   }
 
-  const rpcNetwork = (process.env.NEXT_PUBLIC_RPC_URL ?? '').includes('devnet')
+  const configuredRpc = process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? ''
+  const rpcNetwork = configuredRpc.includes('devnet')
     ? 'Devnet'
-    : (process.env.NEXT_PUBLIC_RPC_URL ?? '').includes('testnet')
+    : configuredRpc.includes('testnet')
     ? 'Testnet'
     : 'Mainnet Beta'
 

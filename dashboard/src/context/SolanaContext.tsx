@@ -47,7 +47,7 @@ export function SolanaProvider({
   children,
   cluster = 'devnet',
 }: SolanaProviderProps) {
-  const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL ?? RPC_ENDPOINTS[cluster]
+  const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? RPC_ENDPOINTS[cluster]
   const wssUrl = process.env.NEXT_PUBLIC_WSS_URL ?? WSS_ENDPOINTS[cluster]
 
   const rpc = useMemo(() => createRpc(cluster), [cluster])

@@ -49,7 +49,7 @@ export type SolanaRpc = ReturnType<typeof createSolanaRpc>
 export type SolanaRpcSubscriptions = ReturnType<typeof createSolanaRpcSubscriptions>
 
 export function createRpc(cluster: Cluster = 'devnet'): SolanaRpc {
-  const url = process.env.NEXT_PUBLIC_RPC_URL ?? RPC_ENDPOINTS[cluster]
+  const url = process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? RPC_ENDPOINTS[cluster]
   return createSolanaRpc(url)
 }
 

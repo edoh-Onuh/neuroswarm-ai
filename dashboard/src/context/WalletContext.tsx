@@ -256,22 +256,47 @@ export function WalletStandardProvider({ children }: { children: ReactNode }) {
           return
         }
 
-        // Step 2: Full connect — shows Phantom popup.
-        // We skip the onlyIfTrusted "wakeup" step because in newer Phantom MV3
-        // builds it can resolve before the SW is ready, causing the subsequent
-        // connect() to hang silently. A direct connect() is more reliable.
-        const result = await Promise.race([
-          provider.connect(),
-          new Promise<never>((_, reject) =>
-            setTimeout(
-              () => reject(new Error('Wallet popup timed out — make sure Phantom is open and try again')),
-              60_000,
-            ),
-          ),
-        ])
+        // Step 2: Connect with retry.
+        // Phantom's MV3 service worker can go dormant. The first connect()
+        // attempt may fail with "Receiving end does not exist" because the
+        // content script's message can't reach the sleeping SW. Chrome will
+        // auto-restart the SW after that failed message, so a second attempt
+        // after a short delay succeeds.
+        const MAX_RETRIES = 2
+        let lastErr: unknown = null
+        let connectResult: { publicKey: { toString(): string } } | null = null
+
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+          if (!connectingRef.current) return
+          try {
+            connectResult = await Promise.race([
+              provider.connect(),
+              new Promise<never>((_, reject) =>
+                setTimeout(
+                  () => reject(new Error('Wallet popup timed out — make sure Phantom is open and try again')),
+                  attempt === 0 ? 15_000 : 60_000, // shorter first timeout for quick retry
+                ),
+              ),
+            ])
+            lastErr = null
+            break // success
+          } catch (e) {
+            lastErr = e
+            const msg = e instanceof Error ? e.message : String(e)
+            const isSwError =
+              msg.includes('Receiving end does not exist') ||
+              msg.includes('disconnected port') ||
+              msg.includes('timed out')
+            if (!isSwError || attempt === MAX_RETRIES - 1) throw e
+            console.warn(`[Wallet] Attempt ${attempt + 1} failed (SW dormant?), retrying in 1s…`, msg)
+            // Give the SW time to fully restart before retrying
+            await new Promise((r) => setTimeout(r, 1_000))
+          }
+        }
+        if (lastErr) throw lastErr
         if (!connectingRef.current) return
 
-        const address = result?.publicKey?.toString?.()
+        const address = connectResult?.publicKey?.toString?.()
         if (!address) throw new Error('No public key returned — wallet may be locked')
 
         setConnectedAddress(address)

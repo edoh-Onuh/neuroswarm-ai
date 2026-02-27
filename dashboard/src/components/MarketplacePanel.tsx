@@ -1,59 +1,54 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { Trophy, Star, Award, CheckCircle, TrendingUp, X, Target, Info } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Trophy, Star, Award, CheckCircle, TrendingUp, X, Target, RefreshCw } from 'lucide-react';
 import { useDashboard } from '@/context/DashboardContext';
 import type { AgentListing } from '@/types';
+import { useSwarmAccounts } from '@/hooks/useSwarmAccounts';
 
-const MOCK_AGENTS: AgentListing[] = [
-  {
-    id: '1',
-    name: 'Elite Day Trader',
-    rating: 'elite',
-    reputation: 2450,
-    winRate: 85,
-    totalProposals: 156,
-    avgROI: 12.5,
-    rentalPrice: 5.0,
-    capabilities: ['Market Analysis', 'Arbitrage', 'Execution']
-  },
-  {
-    id: '2',
-    name: 'Sentinel Risk Guard',
-    rating: 'expert',
-    reputation: 2180,
-    winRate: 92,
-    totalProposals: 89,
-    avgROI: 8.3,
-    rentalPrice: 3.5,
-    capabilities: ['Risk Management', 'Portfolio Protection']
-  },
-  {
-    id: '3',
-    name: 'Alpha Sentiment Scout',
-    rating: 'expert',
-    reputation: 1920,
-    winRate: 78,
-    totalProposals: 134,
-    avgROI: 15.2,
-    rentalPrice: 4.0,
-    capabilities: ['Sentiment Analysis', 'Social Monitoring']
-  },
-  {
-    id: '4',
-    name: 'DeFi Yield Hunter',
-    rating: 'proficient',
-    reputation: 1550,
-    winRate: 81,
-    totalProposals: 67,
-    avgROI: 9.8,
-    rentalPrice: 2.5,
-    capabilities: ['Lending', 'Liquidity Provision', 'Yield Farming']
-  }
-];
+// Capabilities by agent type index (matches on-chain agentType enum)
+const AGENT_CAPABILITIES: Record<number, string[]> = {
+  0: ['Consensus Building', 'Governance', 'Voting Coordination'],
+  1: ['Market Analysis', 'On-Chain Analytics', 'Data Aggregation'],
+  2: ['Trade Execution', 'Arbitrage', 'Order Routing'],
+  3: ['Risk Management', 'Portfolio Protection', 'Drawdown Control'],
+  4: ['Machine Learning', 'Pattern Recognition', 'Strategy Optimization'],
+};
 
 export default function MarketplacePanel() {
-  const [agents] = useState<AgentListing[]>(MOCK_AGENTS);
+  const { agents: liveAgents, isLoading: swarmLoading, refresh } = useSwarmAccounts();
+
+  // Map on-chain agents to AgentListing format
+  const agents = useMemo<AgentListing[]>(() => {
+    if (liveAgents.length === 0) return [];
+    return liveAgents.map((agent, i) => {
+      const rep = agent.reputation; // already divided by 10 in the hook (e.g. 100.0)
+      const repScaled = rep * 10;  // scale back to 3–4 digit display value
+      const rating: AgentListing['rating'] =
+        rep >= 200 ? 'legendary' :
+        rep >= 180 ? 'elite' :
+        rep >= 160 ? 'expert' :
+        rep >= 140 ? 'proficient' : 'developing';
+      const typeIdx = typeof (agent as { type?: number }).type === 'number'
+        ? (agent as { type?: number }).type!
+        : i;
+      const winRate = Math.round(agent.successRate);
+      const totalProposals = (agent as { proposalsCreated?: number }).proposalsCreated ?? 0;
+      const rentalPrice = parseFloat((Math.max(0.5, rep / 20)).toFixed(1));
+      const avgROI = parseFloat((winRate * 0.15).toFixed(1));
+      return {
+        id: agent.id,
+        name: agent.name,
+        rating,
+        reputation: Math.round(repScaled),
+        winRate,
+        totalProposals,
+        avgROI,
+        rentalPrice,
+        capabilities: AGENT_CAPABILITIES[typeIdx] ?? ['Trading', 'Analysis'],
+      };
+    });
+  }, [liveAgents]);
   const [showListingModal, setShowListingModal] = useState(false);
   const [showRentalModal, setShowRentalModal] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<AgentListing | null>(null);
@@ -109,15 +104,35 @@ export default function MarketplacePanel() {
           <Trophy className="w-6 h-6 text-solana-purple" />
           <span>Agent Marketplace</span>
         </h2>
-        <button 
-          onClick={handleListAgent}
-          className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          List Your Agent
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={refresh}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            title="Refresh from chain"
+          >
+            <RefreshCw className={`w-4 h-4 text-gray-400 ${swarmLoading ? 'animate-spin' : ''}`} />
+          </button>
+          <button 
+            onClick={handleListAgent}
+            className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            List Your Agent
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {swarmLoading && agents.length === 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-56 skeleton rounded-lg" />)}
+        </div>
+      ) : agents.length === 0 ? (
+        <div className="text-center py-12 text-gray-400">
+          <Trophy className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p>No agents available on-chain yet.</p>
+        </div>
+      ) : null}
+
+      <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${agents.length === 0 ? 'hidden' : ''}`}>
         {agents.map((agent) => {
           const badge = getRatingBadge(agent.rating);
           return (

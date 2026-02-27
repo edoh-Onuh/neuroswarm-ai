@@ -35,6 +35,10 @@ export interface Agent {
   address?: Address
   /** Last heartbeat timestamp (ms since epoch) */
   lastSeen?: number
+  /** On-chain fields populated when fetched from program accounts */
+  proposalsCreated?: number
+  registeredAt?: number
+  lastActive?: number
 }
 
 // ─── Proposal Types ─────────────────────────────────────────────────
@@ -55,6 +59,8 @@ export interface Proposal {
   timeLeft: string
   description?: string
   createdAt?: number
+  expiresAt?: number
+  votesAbstain?: number
 }
 
 // ─── Sentiment Types ────────────────────────────────────────────────

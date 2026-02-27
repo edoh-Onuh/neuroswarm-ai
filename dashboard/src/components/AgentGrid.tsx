@@ -1,55 +1,8 @@
 'use client'
 
-import { Brain, TrendingUp, Shield, Zap, BookOpen, CheckCircle, Activity } from 'lucide-react'
+import { useSwarmAccounts } from '@/hooks/useSwarmAccounts'
+import { Brain, TrendingUp, Shield, Zap, BookOpen, CheckCircle, Activity, RefreshCw, AlertCircle } from 'lucide-react'
 import type { Agent } from '@/types'
-
-const MOCK_AGENTS: Agent[] = [
-  {
-    id: '69916v2L...',
-    name: 'Consensus Agent',
-    type: 'Consensus',
-    status: 'active',
-    reputation: 102.5,
-    votescast: 6,
-    successRate: 100,
-  },
-  {
-    id: '8KynhjH...',
-    name: 'Analytics Agent',
-    type: 'Analytics',
-    status: 'active',
-    reputation: 101.0,
-    votescast: 6,
-    successRate: 100,
-  },
-  {
-    id: '7AoGPKJ...',
-    name: 'Execution Agent',
-    type: 'Execution',
-    status: 'voting',
-    reputation: 100.5,
-    votescast: 6,
-    successRate: 100,
-  },
-  {
-    id: 'C63K45x...',
-    name: 'Risk Management',
-    type: 'Risk',
-    status: 'active',
-    reputation: 100.0,
-    votescast: 5,
-    successRate: 100,
-  },
-  {
-    id: '2NDikeJ...',
-    name: 'Learning Agent',
-    type: 'Learning',
-    status: 'idle',
-    reputation: 100.0,
-    votescast: 6,
-    successRate: 100,
-  },
-]
 
 const getAgentIcon = (type: string) => {
   switch (type.toLowerCase()) {
@@ -90,33 +43,47 @@ export default function AgentGrid({
   onSearchChange,
   onFilterChange 
 }: AgentGridProps) {
-  let agents = MOCK_AGENTS
-  
-  // Apply filters
+  const { agents: allAgents, isLoading, error, refresh } = useSwarmAccounts()
+
+  let agents = allAgents
+
   if (searchQuery) {
-    agents = agents.filter(agent => 
-      agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      agent.type.toLowerCase().includes(searchQuery.toLowerCase())
+    agents = agents.filter(a =>
+      a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      a.type.toLowerCase().includes(searchQuery.toLowerCase())
     )
   }
-  
   if (filterStatus !== 'all') {
-    agents = agents.filter(agent => agent.status === filterStatus)
+    agents = agents.filter(a => a.status === filterStatus)
   }
-  
-  if (limit) {
-    agents = agents.slice(0, limit)
-  }
+  if (limit) agents = agents.slice(0, limit)
+
+  const allActive = agents.every(a => a.status !== 'idle')
 
   return (
     <div className="card-gradient rounded-xl p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
         <h2 className="text-lg sm:text-xl font-bold text-white">Agent Network</h2>
-        <div className="flex items-center space-x-2 text-xs sm:text-sm text-green-400">
-          <CheckCircle className="w-4 h-4 animate-pulse" />
-          <span>All Systems Operational</span>
+        <div className="flex items-center gap-3">
+          {isLoading && <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" />}
+          <div className={`flex items-center space-x-2 text-xs sm:text-sm ${allActive ? 'text-green-400' : 'text-yellow-400'}`}>
+            <CheckCircle className="w-4 h-4" />
+            <span>{allActive ? 'All Systems Operational' : 'Partial Activity'}</span>
+          </div>
+          {!limit && (
+            <button onClick={refresh} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors" title="Refresh">
+              <RefreshCw className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+          )}
         </div>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-2 mb-4">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
+        </div>
+      )}
 
       {/* Search and Filter */}
       {!limit && onSearchChange && onFilterChange && (

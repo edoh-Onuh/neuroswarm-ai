@@ -1,76 +1,10 @@
 'use client'
 
-import { ThumbsUp, ThumbsDown, Clock, CheckCircle2 } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Clock, CheckCircle2, RefreshCw, AlertCircle } from 'lucide-react'
 import type { Proposal } from '@/types'
+import { useSwarmAccounts } from '@/hooks/useSwarmAccounts'
 
-const MOCK_PROPOSALS: Proposal[] = [
-  {
-    id: 0,
-    title: 'Rebalance Portfolio: Increase SOL Allocation',
-    type: 'Rebalance',
-    proposer: 'Consensus Agent',
-    status: 'executed',
-    votesFor: 4,
-    votesAgainst: 1,
-    totalVotes: 5,
-    timeLeft: 'Executed',
-  },
-  {
-    id: 1,
-    title: 'Emergency Stop: High Volatility Detected',
-    type: 'Emergency',
-    proposer: 'Risk Management',
-    status: 'executed',
-    votesFor: 5,
-    votesAgainst: 0,
-    totalVotes: 5,
-    timeLeft: 'Executed',
-  },
-  {
-    id: 2,
-    title: 'Trade: Swap 0.5 SOL for USDC',
-    type: 'Trade',
-    proposer: 'Execution Agent',
-    status: 'active',
-    votesFor: 3,
-    votesAgainst: 0,
-    totalVotes: 3,
-    timeLeft: '2h 15m',
-  },
-  {
-    id: 3,
-    title: 'Strategy Update: Enable Arbitrage Detection',
-    type: 'Strategy',
-    proposer: 'Analytics Agent',
-    status: 'active',
-    votesFor: 2,
-    votesAgainst: 1,
-    totalVotes: 3,
-    timeLeft: '5h 42m',
-  },
-  {
-    id: 4,
-    title: 'Risk Limit: Set Max Position Size to 30%',
-    type: 'Risk Limit',
-    proposer: 'Risk Management',
-    status: 'passed',
-    votesFor: 4,
-    votesAgainst: 0,
-    totalVotes: 4,
-    timeLeft: 'Awaiting Execution',
-  },
-  {
-    id: 5,
-    title: 'Rebalance: Reduce BONK Exposure',
-    type: 'Rebalance',
-    proposer: 'Learning Agent',
-    status: 'active',
-    votesFor: 1,
-    votesAgainst: 0,
-    totalVotes: 1,
-    timeLeft: '8h 30m',
-  },
-]
+const MOCK_PROPOSALS: Proposal[] = []
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -95,24 +29,38 @@ export default function ProposalList({
   searchQuery = '',
   onSearchChange 
 }: ProposalListProps) {
-  let proposals = MOCK_PROPOSALS
-  
-  // Apply search filter
+  const { proposals: allProposals, isLoading, error, refresh } = useSwarmAccounts()
+
+  let proposals = allProposals
+
   if (searchQuery) {
-    proposals = proposals.filter(proposal => 
-      proposal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      proposal.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      proposal.proposer.toLowerCase().includes(searchQuery.toLowerCase())
+    proposals = proposals.filter(p =>
+      p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.proposer.toLowerCase().includes(searchQuery.toLowerCase())
     )
   }
-  
-  if (limit) {
-    proposals = proposals.slice(0, limit)
-  }
+  if (limit) proposals = proposals.slice(0, limit)
 
   return (
     <div className="card-gradient rounded-xl p-4 sm:p-6">
-      <h2 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6">Proposals</h2>
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
+        <h2 className="text-lg sm:text-xl font-bold text-white">Proposals</h2>
+        <div className="flex items-center gap-2">
+          {isLoading && <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" />}
+          {!limit && (
+            <button onClick={refresh} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors" title="Refresh">
+              <RefreshCw className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-2 mb-4">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />{error}
+        </div>
+      )}
 
       {/* Search */}
       {!limit && onSearchChange && (
@@ -128,7 +76,13 @@ export default function ProposalList({
       )}
 
       <div className="space-y-4">
-        {proposals.map((proposal) => {
+        {!isLoading && proposals.length === 0 ? (
+          <div className="py-12 text-center text-gray-500">
+            <CheckCircle2 className="w-10 h-10 mx-auto mb-3 opacity-40" />
+            <p className="text-sm">No proposals found on-chain yet.</p>
+          </div>
+        ) : (
+        proposals.map((proposal) => {
           const approvalRate = proposal.totalVotes > 0 
             ? (proposal.votesFor / proposal.totalVotes) * 100 
             : 0
@@ -190,6 +144,7 @@ export default function ProposalList({
             </div>
           )
         })}
+        )}
       </div>
     </div>
   )

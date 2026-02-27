@@ -106,6 +106,111 @@ export interface SwarmStateData {
   executedProposals: bigint
 }
 
+/** Utility to decode base64 account data returned by the RPC */
+function decodeAccountBytes(raw: unknown): Uint8Array {
+  if (typeof raw === 'string')
+    return Uint8Array.from(atob(raw), (c) => c.charCodeAt(0))
+  if (Array.isArray(raw))
+    return Uint8Array.from(atob(raw[0] as string), (c) => c.charCodeAt(0))
+  return raw as Uint8Array
+}
+
+// ─── Agent account ──────────────────────────────────────────────────
+
+export interface AgentData {
+  owner: Address
+  /** 0=Consensus 1=Analytics 2=Execution 3=RiskManagement 4=Learning */
+  agentType: number
+  name: string
+  reputation: number
+  proposalsCreated: number
+  votesCast: number
+  successfulProposals: number
+  registeredAt: number
+  lastActive: number
+  isActive: boolean
+}
+
+/** Fetch and decode a single on-chain Agent account by owner public-key. */
+export async function fetchAgentAccount(
+  rpc: SolanaRpc,
+  ownerAddress: Address,
+): Promise<AgentData | null> {
+  const agentPda = await deriveAgentPda(ownerAddress)
+  const accountInfo = await rpc.getAccountInfo(agentPda, { encoding: 'base64' }).send()
+  if (!accountInfo.value) return null
+
+  const bytes = decodeAccountBytes(accountInfo.value.data)
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const addressDecoder = getAddressDecoder()
+  let offset = 8 // discriminator
+
+  const owner = addressDecoder.decode(bytes.slice(offset, offset + 32)); offset += 32
+  const agentType = bytes[offset]; offset += 1
+  const nameLen = view.getUint32(offset, true); offset += 4
+  const name = new TextDecoder().decode(bytes.slice(offset, offset + nameLen)); offset += nameLen
+  const reputation = view.getUint16(offset, true); offset += 2
+  const proposalsCreated = view.getUint32(offset, true); offset += 4
+  const votesCast = view.getUint32(offset, true); offset += 4
+  const successfulProposals = view.getUint32(offset, true); offset += 4
+  const registeredAt = Number(view.getBigInt64(offset, true)); offset += 8
+  const lastActive = Number(view.getBigInt64(offset, true)); offset += 8
+  const isActive = bytes[offset] !== 0
+
+  return { owner, agentType, name, reputation, proposalsCreated, votesCast, successfulProposals, registeredAt, lastActive, isActive }
+}
+
+// ─── Proposal account ───────────────────────────────────────────────
+
+export interface ProposalAccountData {
+  proposer: Address
+  /** 0=Rebalance 1=Trade 2=RiskLimit 3=Strategy 4=Emergency */
+  proposalType: number
+  description: string
+  createdAt: number
+  expiresAt: number
+  executed: boolean
+  executedAt: number
+  votesFor: number
+  votesAgainst: number
+  votesAbstain: number
+  totalVoters: number
+}
+
+/** Fetch and decode a single on-chain Proposal account by its integer ID. */
+export async function fetchProposalAccount(
+  rpc: SolanaRpc,
+  proposalId: bigint,
+): Promise<ProposalAccountData | null> {
+  const proposalPda = await deriveProposalPda(proposalId)
+  const accountInfo = await rpc.getAccountInfo(proposalPda, { encoding: 'base64' }).send()
+  if (!accountInfo.value) return null
+
+  const bytes = decodeAccountBytes(accountInfo.value.data)
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const addressDecoder = getAddressDecoder()
+  let offset = 8 // discriminator
+
+  const proposer = addressDecoder.decode(bytes.slice(offset, offset + 32)); offset += 32
+  const proposalType = bytes[offset]; offset += 1
+  // data: Vec<u8>
+  const dataLen = view.getUint32(offset, true); offset += 4 + dataLen
+  // description: String
+  const descLen = view.getUint32(offset, true); offset += 4
+  const description = new TextDecoder().decode(bytes.slice(offset, offset + descLen)); offset += descLen
+  const createdAt = Number(view.getBigInt64(offset, true)); offset += 8
+  const expiresAt = Number(view.getBigInt64(offset, true)); offset += 8
+  const executed = bytes[offset] !== 0; offset += 1
+  const executedAt = Number(view.getBigInt64(offset, true)); offset += 8
+  const votesFor = view.getUint32(offset, true); offset += 4
+  const votesAgainst = view.getUint32(offset, true); offset += 4
+  const votesAbstain = view.getUint32(offset, true); offset += 4
+  offset += 8 + 8 // skip weighted votes
+  const totalVoters = bytes[offset]
+
+  return { proposer, proposalType, description, createdAt, expiresAt, executed, executedAt, votesFor, votesAgainst, votesAbstain, totalVoters }
+}
+
 /**
  * Fetch and decode the on-chain SwarmState account.
  * Returns null if the account does not exist.
@@ -122,12 +227,7 @@ export async function fetchSwarmState(
   if (!accountInfo.value) return null
 
   // Decode the Anchor account (skip 8-byte discriminator)
-  const raw = accountInfo.value.data
-  const bytes = typeof raw === 'string'
-    ? Uint8Array.from(atob(raw), (c) => c.charCodeAt(0))
-    : Array.isArray(raw)
-      ? Uint8Array.from(atob(raw[0] as string), (c) => c.charCodeAt(0))
-      : raw as Uint8Array
+  const bytes = decodeAccountBytes(accountInfo.value.data)
 
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const offset = 8 // Anchor discriminator

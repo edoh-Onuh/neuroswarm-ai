@@ -10,18 +10,25 @@
  */
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { address } from '@solana/kit'
 import { useSolana } from '@/context/SolanaContext'
 import {
   fetchSwarmState,
   fetchAgentAccount,
   fetchProposalAccount,
+  deriveSwarmPda,
   type AgentData,
   type ProposalAccountData,
   type SwarmStateData,
 } from '@/lib/solana/client'
 import type { Agent, Proposal, AgentType, AgentStatus, ProposalType, ProposalStatus } from '@/types'
+import { cacheSet, cacheGet } from '@/lib/cache'
+
+const CACHE_KEY_AGENTS    = 'swarm:agents'
+const CACHE_KEY_PROPOSALS = 'swarm:proposals'
+const CACHE_KEY_STATE     = 'swarm:state'
+const CACHE_TTL           = 60_000   // 60s
 
 // ── Known agent owner addresses (from keys/ keypairs) ──────────────────────
 const AGENT_OWNERS = [
@@ -125,12 +132,13 @@ function mapProposal(raw: ProposalAccountData, id: number): Proposal {
 // ── Hook ───────────────────────────────────────────────────────────────────
 
 export function useSwarmAccounts(): SwarmAccounts {
-  const { rpc } = useSolana()
+  const { rpc, rpcSubscriptions } = useSolana()
   const [agents,     setAgents]     = useState<Agent[]>([])
   const [proposals,  setProposals]  = useState<Proposal[]>([])
   const [swarmState, setSwarmState] = useState<SwarmStateData | null>(null)
   const [isLoading,  setIsLoading]  = useState(true)
   const [error,      setError]      = useState<string | null>(null)
+  const wsAbortRef = useRef<AbortController | null>(null)
 
   const refresh = useCallback(async () => {
     setIsLoading(true)
@@ -138,6 +146,7 @@ export function useSwarmAccounts(): SwarmAccounts {
     try {
       const state = await fetchSwarmState(rpc)
       setSwarmState(state)
+      if (state) await cacheSet(CACHE_KEY_STATE, state, CACHE_TTL)
 
       const agentResults = await Promise.allSettled(
         AGENT_OWNERS.map(meta =>
@@ -166,6 +175,7 @@ export function useSwarmAccounts(): SwarmAccounts {
         return []
       })
       setAgents(liveAgents)
+      await cacheSet(CACHE_KEY_AGENTS, liveAgents, CACHE_TTL)
 
       const total = state ? Number(state.totalProposals) : 0
       if (total > 0) {
@@ -181,6 +191,7 @@ export function useSwarmAccounts(): SwarmAccounts {
           return []
         })
         setProposals(liveProposals)
+        await cacheSet(CACHE_KEY_PROPOSALS, liveProposals, CACHE_TTL)
       } else {
         setProposals([])
       }
@@ -192,11 +203,59 @@ export function useSwarmAccounts(): SwarmAccounts {
     }
   }, [rpc])
 
+  // ── Seed from cache immediately (eliminates blank-screen flash) ────────
+  useEffect(() => {
+    let cancelled = false
+    const hydrate = async () => {
+      const [cachedAgents, cachedProposals, cachedState] = await Promise.all([
+        cacheGet<Agent[]>(CACHE_KEY_AGENTS),
+        cacheGet<Proposal[]>(CACHE_KEY_PROPOSALS),
+        cacheGet<SwarmStateData>(CACHE_KEY_STATE),
+      ])
+      if (cancelled) return
+      if (cachedAgents)    { setAgents(cachedAgents);       setIsLoading(false) }
+      if (cachedProposals) setProposals(cachedProposals)
+      if (cachedState)     setSwarmState(cachedState)
+    }
+    hydrate()
+    return () => { cancelled = true }
+  }, [])
+
+  // ── Poll every 30s ─────────────────────────────────────────────────────
   useEffect(() => {
     refresh()
     const id = setInterval(refresh, 30_000)
     return () => clearInterval(id)
   }, [refresh])
+
+  // ── WebSocket subscription on the SwarmState PDA ───────────────────────
+  // Triggers a full refresh whenever the on-chain account changes — meaning
+  // the UI updates in real-time without waiting for the 30s poll.
+  useEffect(() => {
+    let alive = true
+    const ac = new AbortController()
+    wsAbortRef.current = ac
+
+    const subscribe = async () => {
+      try {
+        const swarmPda = await deriveSwarmPda()
+        const subscription = await rpcSubscriptions.accountNotifications(swarmPda, { commitment: 'confirmed' }).subscribe({ abortSignal: ac.signal })
+        for await (const _ of subscription) {
+          if (!alive) break
+          refresh()
+        }
+      } catch (err: unknown) {
+        if ((err as Error)?.name !== 'AbortError' && alive)
+          console.warn('[useSwarmAccounts] WS subscription failed, relying on polling:', (err as Error)?.message)
+      }
+    }
+
+    subscribe()
+    return () => {
+      alive = false
+      ac.abort()
+    }
+  }, [rpcSubscriptions, refresh])
 
   return { agents, proposals, swarmState, isLoading, error, refresh }
 }

@@ -19,6 +19,7 @@ import {
   getProgramDerivedAddress,
   type Address,
 } from '@solana/kit'
+import { resilientCall } from '@/lib/rpc-resilience'
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -137,7 +138,9 @@ export async function fetchAgentAccount(
   ownerAddress: Address,
 ): Promise<AgentData | null> {
   const agentPda = await deriveAgentPda(ownerAddress)
-  const accountInfo = await rpc.getAccountInfo(agentPda, { encoding: 'base64' }).send()
+  const accountInfo = await resilientCall(() =>
+    rpc.getAccountInfo(agentPda, { encoding: 'base64' }).send()
+  )
   if (!accountInfo.value) return null
 
   const bytes = decodeAccountBytes(accountInfo.value.data)
@@ -183,7 +186,9 @@ export async function fetchProposalAccount(
   proposalId: bigint,
 ): Promise<ProposalAccountData | null> {
   const proposalPda = await deriveProposalPda(proposalId)
-  const accountInfo = await rpc.getAccountInfo(proposalPda, { encoding: 'base64' }).send()
+  const accountInfo = await resilientCall(() =>
+    rpc.getAccountInfo(proposalPda, { encoding: 'base64' }).send()
+  )
   if (!accountInfo.value) return null
 
   const bytes = decodeAccountBytes(accountInfo.value.data)
@@ -220,9 +225,9 @@ export async function fetchSwarmState(
 ): Promise<SwarmStateData | null> {
   const swarmPda = await deriveSwarmPda()
 
-  const accountInfo = await rpc
-    .getAccountInfo(swarmPda, { encoding: 'base64' })
-    .send()
+  const accountInfo = await resilientCall(() =>
+    rpc.getAccountInfo(swarmPda, { encoding: 'base64' }).send()
+  )
 
   if (!accountInfo.value) return null
 

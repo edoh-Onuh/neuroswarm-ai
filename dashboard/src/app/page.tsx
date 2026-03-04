@@ -22,7 +22,8 @@ const GovernancePanel = dynamic(() => import('@/components/GovernancePanel'), { 
 const SentimentPanel  = dynamic(() => import('@/components/SentimentPanel'),  { ssr: false })
 const ArbitragePanel  = dynamic(() => import('@/components/ArbitragePanel'),  { ssr: false })
 const MarketplacePanel= dynamic(() => import('@/components/MarketplacePanel'),{ ssr: false })
-import { TrendingUp, Users, Vote, Loader2, BarChart3, Building, Search, ArrowRightLeft, ShoppingBag } from 'lucide-react'
+const HistoryPanel    = dynamic(() => import('@/components/HistoryPanel'),    { ssr: false })
+import { TrendingUp, Users, Vote, Loader2, BarChart3, Building, Search, ArrowRightLeft, ShoppingBag, Activity } from 'lucide-react'
 import { useDashboard } from '@/context/DashboardContext'
 import type { Agent, Proposal } from '@/types'
 
@@ -156,6 +157,7 @@ export default function Dashboard() {
     { id: 'sentiment' as const, label: 'Sentiment', icon: Search },
     { id: 'arbitrage' as const, label: 'Arbitrage', icon: ArrowRightLeft },
     { id: 'marketplace' as const, label: 'Marketplace', icon: ShoppingBag },
+    { id: 'history'     as const, label: 'History',     icon: Activity },
   ], [])
 
   return (
@@ -252,6 +254,7 @@ export default function Dashboard() {
             {activeTab === 'sentiment' && <SentimentPanel />}
             {activeTab === 'arbitrage' && <ArbitragePanel />}
             {activeTab === 'marketplace' && <MarketplacePanel />}
+            {activeTab === 'history'     && <HistoryPanel />}
           </>
         )}
       </main>

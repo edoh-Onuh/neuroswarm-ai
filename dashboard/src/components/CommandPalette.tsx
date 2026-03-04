@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Search, BarChart3, Users, Vote, Briefcase, Building, TrendingUp, ShoppingBag, RefreshCw, Download, Sun, Moon } from 'lucide-react'
+import { Search, BarChart3, Users, Vote, Briefcase, Building, TrendingUp, ShoppingBag, RefreshCw, Download, Sun, Moon, Activity } from 'lucide-react'
 import { useDashboard } from '@/context/DashboardContext'
 
 interface PaletteCommand {
@@ -35,6 +35,7 @@ export default function CommandPalette() {
     { id: 'governance',  label: 'Go to Governance',  shortcut: 'G', icon: <Building   className="w-4 h-4" />, action: () => { setActiveTab('governance');  close() }, category: 'navigation' },
     { id: 'sentiment',   label: 'Go to Sentiment',   shortcut: 'S', icon: <TrendingUp className="w-4 h-4" />, action: () => { setActiveTab('sentiment');   close() }, category: 'navigation' },
     { id: 'marketplace', label: 'Go to Marketplace', shortcut: 'M', icon: <ShoppingBag className="w-4 h-4" />, action: () => { setActiveTab('marketplace'); close() }, category: 'navigation' },
+    { id: 'history',     label: 'Go to History',     shortcut: 'H', icon: <Activity    className="w-4 h-4" />, action: () => { setActiveTab('history');     close() }, category: 'navigation' },
     { id: 'refresh',     label: 'Refresh Data',      shortcut: 'R', icon: <RefreshCw  className="w-4 h-4" />, action: () => { refreshData(); close() },             category: 'actions' },
     { id: 'export',      label: 'Export Data',       shortcut: 'E', icon: <Download   className="w-4 h-4" />, action: () => { setActiveTab('overview'); close() },  category: 'actions' },
     {
@@ -47,10 +48,29 @@ export default function CommandPalette() {
     },
   ], [theme, close, setActiveTab, refreshData, toggleTheme])
 
-  const filteredCommands = useMemo(
-    () => commands.filter(cmd => cmd.label.toLowerCase().includes(search.toLowerCase())),
-    [commands, search]
-  )
+  const filteredCommands = useMemo(() => {
+    const q = search.toLowerCase().trim()
+    if (!q) return commands
+    // Natural language intent matching (checks keywords, not just label prefix)
+    const nl: Record<string, string[]> = {
+      overview:    ['home', 'main', 'dashboard', 'start', 'summary'],
+      agents:      ['agent', 'bots', 'workers', 'ai agents'],
+      proposals:   ['vote', 'voting', 'proposal', 'governance proposal'],
+      portfolio:   ['portfolio', 'balance', 'wallet', 'holdings', 'pnl', 'p&l'],
+      governance:  ['governance', 'coalition', 'dao', 'rules'],
+      sentiment:   ['sentiment', 'market mood', 'fear', 'greed'],
+      arbitrage:   ['arb', 'arbitrage', 'spread', 'trade'],
+      marketplace: ['market', 'marketplace', 'buy', 'sell', 'shop'],
+      history:     ['history', 'chart', 'historical', 'performance', 'past'],
+      refresh:     ['reload', 'update', 'sync', 'fetch'],
+      export:      ['download', 'csv', 'save data'],
+      theme:       ['dark', 'light', 'color', 'appearance'],
+    }
+    return commands.filter(cmd => {
+      if (cmd.label.toLowerCase().includes(q)) return true
+      return (nl[cmd.id] ?? []).some(kw => kw.includes(q) || q.includes(kw))
+    })
+  }, [commands, search])
 
   // Keyboard open/close
   useEffect(() => {

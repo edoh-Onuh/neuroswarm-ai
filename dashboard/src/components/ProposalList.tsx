@@ -143,7 +143,7 @@ export default function ProposalList({
               )}
             </div>
           )
-        })}
+        })
         )}
       </div>
     </div>

@@ -29,8 +29,8 @@ export default function MarketplacePanel() {
         rep >= 180 ? 'elite' :
         rep >= 160 ? 'expert' :
         rep >= 140 ? 'proficient' : 'developing';
-      const typeIdx = typeof (agent as { type?: number }).type === 'number'
-        ? (agent as { type?: number }).type!
+      const typeIdx = typeof (agent as unknown as { type?: number }).type === 'number'
+        ? (agent as unknown as { type?: number }).type!
         : i;
       const winRate = Math.round(agent.successRate);
       const totalProposals = (agent as { proposalsCreated?: number }).proposalsCreated ?? 0;

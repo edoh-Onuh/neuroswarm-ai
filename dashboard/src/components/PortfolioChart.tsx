@@ -78,14 +78,16 @@ export default function PortfolioChart() {
 
       // Fetch SOL price — try multiple free APIs (Jupiter v2 now requires an API key)
       let solPrice = 0
+      let solChange24h = 0
       try {
-        // 1. CoinGecko free API (no key needed, 30 req/min)
+        // 1. CoinGecko free API (no key needed, 30 req/min) — includes 24h change
         const cgRes = await fetch(
-          'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd',
+          'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd&include_24hr_change=true',
         )
         if (cgRes.ok) {
           const cgJson = await cgRes.json()
           solPrice = cgJson?.solana?.usd ?? 0
+          solChange24h = cgJson?.solana?.usd_24h_change ?? 0
         }
       } catch { /* CoinGecko failed */ }
 
@@ -110,7 +112,7 @@ export default function PortfolioChart() {
           balance: solBalance,
           valueUsd: solValue,
           allocation: total > 0 ? (solValue / total) * 100 : 0,
-          change24h: 0, // would need historical price for real change
+          change24h: parseFloat(solChange24h.toFixed(2)),
           color: TOKEN_COLORS.SOL ?? '#9945FF',
         })
       }
@@ -163,8 +165,9 @@ export default function PortfolioChart() {
   }
 
   const handleRebalance = () => {
+    // Rebalancing requires on-chain program support — refresh portfolio data instead
     setIsRebalancing(true)
-    setTimeout(() => setIsRebalancing(false), 2000)
+    fetchPortfolio().finally(() => setIsRebalancing(false))
   }
 
   const configuredRpc = process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? ''
@@ -294,7 +297,7 @@ export default function PortfolioChart() {
               className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-solana-purple/20 hover:bg-solana-purple/30 border border-solana-purple/50 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw className={`w-4 h-4 ${isRebalancing ? 'animate-spin' : ''}`} />
-              <span className="text-sm font-medium">{isRebalancing ? 'Rebalancing...' : 'Rebalance'}</span>
+              <span className="text-sm font-medium">{isRebalancing ? 'Refreshing...' : 'Refresh'}</span>
             </button>
           </div>
           <div className="h-64 flex items-center justify-center relative">

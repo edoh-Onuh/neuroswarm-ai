@@ -3,23 +3,46 @@
 import { Download, FileText, FileSpreadsheet, Share2 } from 'lucide-react'
 import { useState } from 'react'
 import { useDashboard } from '@/context/DashboardContext'
+import { useSwarmAccounts } from '@/hooks/useSwarmAccounts'
 
 export default function ExportPanel() {
   const [isExporting, setIsExporting] = useState(false)
   const [shareLink, setShareLink] = useState<string | null>(null)
   const { addNotification } = useDashboard()
+  const { agents, proposals, swarmState } = useSwarmAccounts()
 
   const handleExport = async (format: 'json' | 'csv' | 'share') => {
     setIsExporting(true)
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
+
     const data = {
       exportedAt: new Date().toISOString(),
       dashboard: 'NeuroSwarm AI',
-      network: 'devnet',
-      metrics: {
-        note: 'Live metrics from on-chain data',
-      },
+      network: process.env.NEXT_PUBLIC_CLUSTER ?? 'devnet',
+      swarmState: swarmState ? {
+        activeAgents: swarmState.activeAgents,
+        totalProposals: Number(swarmState.totalProposals),
+      } : null,
+      agents: agents.map(a => ({
+        id: a.id,
+        name: a.name,
+        type: a.type,
+        status: a.status,
+        reputation: a.reputation,
+        votescast: a.votescast,
+        successRate: a.successRate,
+        proposalsCreated: a.proposalsCreated ?? 0,
+      })),
+      proposals: proposals.map(p => ({
+        id: p.id,
+        title: p.title,
+        type: p.type,
+        status: p.status,
+        proposer: p.proposer,
+        votesFor: p.votesFor,
+        votesAgainst: p.votesAgainst,
+        totalVotes: p.totalVotes,
+        timeLeft: p.timeLeft,
+      })),
     }
     
     if (format === 'json') {
@@ -30,14 +53,14 @@ export default function ExportPanel() {
       a.download = `neuroswarm-export-${Date.now()}.json`
       a.click()
       URL.revokeObjectURL(url)
-      addNotification({ type: 'success', title: 'Export Complete', message: 'JSON file downloaded.' })
+      addNotification({ type: 'success', title: 'Export Complete', message: `JSON exported with ${agents.length} agents and ${proposals.length} proposals.` })
     } else if (format === 'csv') {
-      const csvContent = [
-        ['Metric', 'Value'],
-        ['Export Date', data.exportedAt],
-        ['Dashboard', data.dashboard],
-        ['Network', data.network],
-      ].map(row => row.join(',')).join('\n')
+      const rows: string[][] = [
+        ['Section', 'ID', 'Name', 'Type', 'Status', 'Value1', 'Value2'],
+        ...agents.map(a => ['Agent', a.id, a.name, a.type, a.status, `Rep:${a.reputation}`, `Success:${a.successRate}%`]),
+        ...proposals.map(p => ['Proposal', String(p.id), p.title, p.type, p.status, `For:${p.votesFor}`, `Against:${p.votesAgainst}`]),
+      ]
+      const csvContent = rows.map(row => row.map(c => `"${c}"`).join(',')).join('\n')
       
       const blob = new Blob([csvContent], { type: 'text/csv' })
       const url = URL.createObjectURL(blob)
@@ -46,14 +69,13 @@ export default function ExportPanel() {
       a.download = `neuroswarm-export-${Date.now()}.csv`
       a.click()
       URL.revokeObjectURL(url)
-      addNotification({ type: 'success', title: 'Export Complete', message: 'CSV file downloaded.' })
+      addNotification({ type: 'success', title: 'Export Complete', message: `CSV exported with ${rows.length - 1} rows.` })
     } else if (format === 'share') {
-      // Use a short random ID instead of embedding data in the URL
-      const shareId = crypto.randomUUID().slice(0, 8)
-      const shareUrl = `${window.location.origin}/share/${shareId}`
-      setShareLink(shareUrl)
-      await navigator.clipboard.writeText(shareUrl)
-      addNotification({ type: 'success', title: 'Link Copied', message: 'Share link copied to clipboard.' })
+      // Copy a summary to clipboard (no fake share URL)
+      const summary = `NeuroSwarm AI — ${agents.length} agents, ${proposals.length} proposals on ${data.network} (${data.exportedAt})`
+      await navigator.clipboard.writeText(summary)
+      setShareLink(summary)
+      addNotification({ type: 'success', title: 'Copied', message: 'Dashboard summary copied to clipboard.' })
     }
     
     setIsExporting(false)

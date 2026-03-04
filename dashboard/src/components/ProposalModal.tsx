@@ -57,15 +57,15 @@ export default function ProposalModal({ proposal, onClose, onVote }: ProposalMod
   const handleVote = (vote: 'approve' | 'reject') => {
     setSelectedVote(vote)
     setVoting(true)
-    setTimeout(() => {
-      onVote(vote)
-      setVoting(false)
-      addNotification({
-        type: 'success',
-        title: `Vote ${vote === 'approve' ? 'Approved' : 'Rejected'}`,
-        message: `Your ${vote} vote on proposal #${proposal.id} has been recorded.`,
-      })
-    }, 1500)
+    // On-chain voting requires a connected wallet and agent registration.
+    // For now, record the vote intent and notify the parent component.
+    onVote(vote)
+    addNotification({
+      type: 'info',
+      title: `Vote Recorded`,
+      message: `Your ${vote} vote on proposal #${proposal.id} has been recorded locally. On-chain submission requires a registered agent wallet.`,
+    })
+    setVoting(false)
   }
 
   const fetchAiAnalysis = useCallback(async () => {

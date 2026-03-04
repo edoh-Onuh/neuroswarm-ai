@@ -12,17 +12,17 @@ interface MetricsPanelProps {
   }
 }
 
-/** Tiny helper – returns a coloured "+N" / "−N" / "—" change pill */
+/** Tiny helper – returns a coloured label pill */
 function ChangeBadge({ value }: { value: string }) {
   const isPositive = value.startsWith('+')
-  const isNeutral = value === '—'
+  const isNeutral = value === '—' || value.startsWith('Live')
   return (
     <p
       className={`text-xs sm:text-sm truncate font-medium ${
         isNeutral ? 'text-gray-400' : isPositive ? 'text-green-400' : 'text-red-400'
       }`}
     >
-      {value} from last hour
+      {value}
     </p>
   )
 }
@@ -34,28 +34,28 @@ function MetricsPanelInner({ data }: MetricsPanelProps) {
       value: data.totalAgents,
       icon: Users,
       color: 'from-blue-500 to-cyan-500',
-      change: data.totalAgents > 0 ? `+${data.totalAgents}` : '—',
+      change: data.totalAgents > 0 ? `Live on-chain` : '—',
     },
     {
       label: 'Total Proposals',
       value: data.totalProposals,
       icon: FileText,
       color: 'from-purple-500 to-pink-500',
-      change: data.totalProposals > 0 ? `+${data.totalProposals}` : '—',
+      change: data.totalProposals > 0 ? `Live on-chain` : '—',
     },
     {
       label: 'Active Proposals',
       value: data.activeProposals,
       icon: CheckCircle,
       color: 'from-green-500 to-emerald-500',
-      change: data.activeProposals > 0 ? `+${data.activeProposals}` : '—',
+      change: data.activeProposals > 0 ? `${data.activeProposals} awaiting votes` : '—',
     },
     {
       label: 'Portfolio Value',
       value: `$${data.portfolioValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       icon: DollarSign,
       color: 'from-yellow-500 to-orange-500',
-      change: data.portfolioValue > 0 ? '—' : '—',
+      change: data.portfolioValue > 0 ? 'Wallet balance' : 'Connect wallet',
     },
   ]
 

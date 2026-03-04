@@ -4,8 +4,6 @@ import { ThumbsUp, ThumbsDown, Clock, CheckCircle2, RefreshCw, AlertCircle } fro
 import type { Proposal } from '@/types'
 import { useSwarmAccounts } from '@/hooks/useSwarmAccounts'
 
-const MOCK_PROPOSALS: Proposal[] = []
-
 const getStatusColor = (status: string) => {
   switch (status) {
     case 'active': return 'bg-blue-500/20 text-blue-400'

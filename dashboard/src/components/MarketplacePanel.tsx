@@ -34,6 +34,7 @@ export default function MarketplacePanel() {
         : i;
       const winRate = Math.round(agent.successRate);
       const totalProposals = (agent as { proposalsCreated?: number }).proposalsCreated ?? 0;
+      // Rental price and ROI are estimated from on-chain reputation/performance (marketplace program not yet deployed)
       const rentalPrice = parseFloat((Math.max(0.5, rep / 20)).toFixed(1));
       const avgROI = parseFloat((winRate * 0.15).toFixed(1));
       return {
@@ -147,7 +148,7 @@ export default function MarketplacePanel() {
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-purple-400">{agent.rentalPrice} SOL</div>
-                  <div className="text-xs text-gray-400">per day</div>
+                  <div className="text-xs text-gray-400">est. per day</div>
                 </div>
               </div>
 
@@ -255,9 +256,9 @@ export default function MarketplacePanel() {
                 <button 
                   onClick={() => {
                     addNotification({
-                      type: 'success',
-                      title: 'Agent Listed',
-                      message: 'Your agent has been listed on the marketplace.',
+                      type: 'info',
+                      title: 'Coming Soon',
+                      message: 'Agent listing requires the marketplace program to be deployed on-chain.',
                     });
                     setShowListingModal(false);
                   }}
@@ -340,9 +341,9 @@ export default function MarketplacePanel() {
                 <button 
                   onClick={() => {
                     addNotification({
-                      type: 'success',
-                      title: 'Agent Rented',
-                      message: `Successfully rented ${selectedAgent.name} for ${rentalDays} days (${(selectedAgent.rentalPrice * rentalDays).toFixed(1)} SOL).`,
+                      type: 'info',
+                      title: 'Coming Soon',
+                      message: `Agent rental requires the marketplace program to be deployed on-chain. Estimated cost: ${(selectedAgent.rentalPrice * rentalDays).toFixed(1)} SOL for ${rentalDays} days.`,
                     });
                     setShowRentalModal(false);
                     setSelectedAgent(null);
